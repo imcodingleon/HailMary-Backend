@@ -11,8 +11,8 @@ from app.domains.user.domain.value_object.gender import Gender
 class User:
     birth_info: BirthInfo
     gender: Gender
+    name: str
     id: int | None = None
-    name: str | None = None
     created_at: datetime | None = None
 
     def __repr__(self) -> str:

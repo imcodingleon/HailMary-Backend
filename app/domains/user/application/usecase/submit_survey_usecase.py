@@ -35,4 +35,4 @@ class SubmitSurveyUseCase:
         )
         saved = await self._survey_repo.save(survey)
         assert saved.id is not None
-        return SurveyResponse(survey_id=saved.id, saju_request_id=request.saju_request_id)
+        return SurveyResponse(surveyId=saved.id, sajuRequestId=request.saju_request_id)

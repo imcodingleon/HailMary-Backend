@@ -21,7 +21,16 @@ from app.infrastructure.config.settings import get_settings
 from app.infrastructure.database.session import AsyncSessionLocal
 from app.infrastructure.external.fortuneteller.client import FortuneTellerClient
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="HailMary Backend", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 _settings = get_settings()
 

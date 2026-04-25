@@ -43,4 +43,4 @@ class SubmitUserInfoUseCase:
         )
         await self._saju_result_repo.save(saju_result)
 
-        return FreeResultResponse(saju_request_id=saved_user.id, saju_data=ft_response)
+        return FreeResultResponse(sajuRequestId=saved_user.id, sajuData=ft_response)

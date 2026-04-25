@@ -11,6 +11,6 @@ class GetFreeResultUseCase:
         if result is None:
             raise ValueError(f"사주 결과가 없습니다: {user_id}")
         return FreeResultResponse(
-            saju_request_id=user_id,
-            saju_data=result.fortuneteller_response,
+            sajuRequestId=user_id,
+            sajuData=result.fortuneteller_response,
         )

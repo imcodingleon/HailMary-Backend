@@ -19,4 +19,4 @@ class UserORM(Base):
     )
     birth_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     birth_time_unknown: Mapped[bool] = mapped_column(Boolean, default=False)
-    name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)

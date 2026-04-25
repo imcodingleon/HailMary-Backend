@@ -12,8 +12,8 @@ class SubmitUserInfoRequest(BaseModel):
     birth: str                       # "YYYY-MM-DD"
     calendar: CalendarType
     gender: Gender
+    name: str
     time: str | None = None          # "HH:MM" 또는 null(모름)
-    name: str | None = None
 
     @field_validator("birth")
     @classmethod
