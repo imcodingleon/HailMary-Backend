@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.infrastructure.external.fortuneteller.client import FortuneTellerError
+
 from app.domains.user.application.request.submit_survey_request import SubmitSurveyRequest
 from app.domains.user.application.request.submit_user_info_request import SubmitUserInfoRequest
 from app.domains.user.application.response.free_result_response import FreeResultResponse
@@ -31,7 +33,9 @@ async def submit_free(
 ) -> FreeResultResponse:
     try:
         return await usecase.execute(body)
-    except Exception as e:
+    except FortuneTellerError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e)) from e
+    except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 

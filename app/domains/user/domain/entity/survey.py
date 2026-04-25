@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 
 
@@ -17,4 +17,4 @@ class Survey:
     def __post_init__(self) -> None:
         if self.step3_text is not None:
             trimmed = self.step3_text.strip()
-            object.__setattr__(self, "step3_text", trimmed if trimmed else None)
+            self.step3_text = trimmed if trimmed else None
