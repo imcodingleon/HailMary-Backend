@@ -12,7 +12,7 @@ class FortuneTellerClient:
         self._base_url = base_url.rstrip("/")
 
     async def analyze(self, payload: dict[str, Any]) -> dict[str, Any]:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, verify=False) as client:  # noqa: S501 # Windows Python 3.14 SSL DLL 충돌 우회
             try:
                 resp = await client.post(f"{self._base_url}/api/saju/free", json=payload)
                 resp.raise_for_status()

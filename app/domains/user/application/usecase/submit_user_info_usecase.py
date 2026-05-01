@@ -1,11 +1,17 @@
 from app.domains.user.application.request.submit_user_info_request import SubmitUserInfoRequest
 from app.domains.user.application.response.free_result_response import FreeResultResponse
+from app.domains.user.application.saju_response_builder import build_free_result_response
 from app.domains.user.domain.entity.saju_result import SajuResult
 from app.domains.user.domain.entity.user import User
 from app.domains.user.domain.port.fortuneteller_port import FortuneTellerPort
 from app.domains.user.domain.port.saju_result_repository_port import SajuResultRepositoryPort
 from app.domains.user.domain.port.user_repository_port import UserRepositoryPort
+from app.domains.user.domain.service.blocking_service import BlockingService
+from app.domains.user.domain.service.charm_service import CharmService
+from app.domains.user.domain.service.monthly_romance_flow_service import MonthlyRomanceFlowService
 from app.domains.user.domain.service.saju_data_extractor import SajuDataExtractor
+from app.domains.user.domain.service.spouse_avoid_service import SpouseAvoidService
+from app.domains.user.domain.service.spouse_match_service import SpouseMatchService
 from app.domains.user.domain.value_object.birth_info import BirthInfo
 
 
@@ -16,11 +22,21 @@ class SubmitUserInfoUseCase:
         saju_result_repo: SajuResultRepositoryPort,
         fortuneteller: FortuneTellerPort,
         saju_data_extractor: SajuDataExtractor,
+        charm_service: CharmService,
+        blocking_service: BlockingService,
+        spouse_avoid_service: SpouseAvoidService,
+        spouse_match_service: SpouseMatchService,
+        monthly_romance_flow_service: MonthlyRomanceFlowService,
     ) -> None:
         self._user_repo = user_repo
         self._saju_result_repo = saju_result_repo
         self._fortuneteller = fortuneteller
         self._extractor = saju_data_extractor
+        self._charm = charm_service
+        self._blocking = blocking_service
+        self._spouse_avoid = spouse_avoid_service
+        self._spouse_match = spouse_match_service
+        self._monthly_romance_flow = monthly_romance_flow_service
 
     async def execute(self, request: SubmitUserInfoRequest) -> FreeResultResponse:
         birth_info = BirthInfo(
@@ -43,4 +59,17 @@ class SubmitUserInfoUseCase:
         )
         await self._saju_result_repo.save(saju_result)
 
-        return FreeResultResponse(sajuRequestId=saved_user.id, sajuData=ft_response)
+        time_unknown = birth_info.birth_time_unknown
+        # FortuneTeller 응답에 gender 가 비어 있을 수 있으므로 도메인 값으로 보강
+        analysis_input = dict(ft_response)
+        analysis_input.setdefault("gender", saved_user.gender.value)
+
+        return build_free_result_response(
+            saju_request_id=saved_user.id,
+            saju_data=ft_response,
+            charm=self._charm.calculate(analysis_input),
+            blocking=self._blocking.calculate(analysis_input, time_unknown),
+            spouse_avoid=self._spouse_avoid.calculate(analysis_input),
+            spouse_match=self._spouse_match.calculate(analysis_input),
+            monthly_romance_flow=self._monthly_romance_flow.calculate(analysis_input),
+        )
