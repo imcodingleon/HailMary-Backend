@@ -1,0 +1,78 @@
+name: Deploy Backend to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: true
+
+env:
+  APP_DIR: /home/ec2-user/hailmary-backend
+  UV_BIN: /home/ec2-user/.local/bin/uv
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, hailmary-backend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync source to ${{ env.APP_DIR }}
+        run: |
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.venv' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='fortuneteller-main' \
+            --exclude='fortuneteller-main.zip' \
+            --exclude='docker-compose.yml' \
+            ./ "$APP_DIR/"
+
+      - name: Write .env.prod
+        run: |
+          umask 077
+          cat > "$APP_DIR/.env.prod" <<EOF
+          APP_ENV=production
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
+          MYSQL_USER=${{ secrets.MYSQL_USER }}
+          FORTUNETELLER_URL=${{ secrets.FORTUNETELLER_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          EOF
+
+      - name: Install dependencies (uv sync)
+        working-directory: ${{ env.APP_DIR }}
+        run: $UV_BIN sync --frozen
+
+      - name: Run database migrations
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -a
+          . "$APP_DIR/.env.prod"
+          set +a
+          $UV_BIN run alembic upgrade head
+
+      - name: Restart backend service
+        run: sudo /usr/bin/systemctl restart hailmary-backend.service
+
+      - name: Wait for /health
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://api.dohwaseonsaju.com/health || true)
+            if [ "$code" = "200" ]; then
+              echo "Backend healthy"
+              exit 0
+            fi
+            echo "[$i/30] status=$code, retry in 2s"
+            sleep 2
+          done
+          echo "::error::Backend did not become healthy in 60s"
+          sudo /usr/bin/journalctl -u hailmary-backend.service --since '2 minutes ago' --no-pager | tail -80
+          exit 1

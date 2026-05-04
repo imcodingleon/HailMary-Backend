@@ -40,8 +40,10 @@ _settings = get_settings()
 def _allowed_origins() -> list[str]:
     if _settings.app_env == "local":
         return ["http://localhost:3000"]
-    # 프로덕션 도메인 — settings에 추가 후 확장 (Phase 2 H1)
-    return ["http://localhost:3000"]
+    return [
+        "https://dohwaseonsaju.com",
+        "https://www.dohwaseonsaju.com",
+    ]
 
 
 app.add_middleware(
