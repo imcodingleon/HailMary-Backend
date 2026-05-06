@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     toss_secret_key: str | None = None
     toss_base_url: str = "https://api.tosspayments.com"
 
-    model_config = SettingsConfigDict(env_file=".env.local", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env.local", env_file_encoding="utf-8", extra="ignore"
+    )
 
 
 @lru_cache

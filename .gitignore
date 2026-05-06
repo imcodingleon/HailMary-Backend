@@ -31,6 +31,9 @@ env/
 *.swp
 *.swo
 
+# Claude Code (per-user local settings)
+.claude/settings.local.json
+
 # Testing
 .pytest_cache/
 .coverage
