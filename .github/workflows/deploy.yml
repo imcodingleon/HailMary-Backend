@@ -45,6 +45,7 @@ jobs:
           MYSQL_USER=${{ secrets.MYSQL_USER }}
           FORTUNETELLER_URL=${{ secrets.FORTUNETELLER_URL }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
+          TOSS_SECRET_KEY=${{ secrets.TOSS_SECRET_KEY }}
           EOF
 
       - name: Install dependencies (uv sync)
