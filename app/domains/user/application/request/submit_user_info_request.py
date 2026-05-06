@@ -5,6 +5,7 @@ from datetime import date, time
 from pydantic import BaseModel, field_validator
 
 from app.domains.user.domain.value_object.calendar_type import CalendarType
+from app.domains.user.domain.value_object.character_type import CharacterType
 from app.domains.user.domain.value_object.gender import Gender
 
 
@@ -14,6 +15,7 @@ class SubmitUserInfoRequest(BaseModel):
     gender: Gender
     name: str
     time: str | None = None          # "HH:MM" 또는 null(모름)
+    character_id: CharacterType | None = None  # 어떤 캐릭터의 설문인지 (yeonwoo / doyoon)
 
     @field_validator("birth")
     @classmethod

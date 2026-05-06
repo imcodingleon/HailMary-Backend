@@ -163,7 +163,9 @@ def _calculate_score(saju: dict[str, Any], dohwa_pillars: list[PillarKey]) -> in
     if _is_dohwa_in_gong_mang(saju, dohwa_pillars):
         score -= 10
 
-    return max(0, min(100, round(score)))
+    # 서비스 UX: 매우 낮은 매력 점수가 사용자에게 부정적으로 비춰지는 것을 방지하기 위해
+    # 최저값을 20으로 floor 적용 (21점 이상 사용자는 자연 분포 유지).
+    return max(20, min(100, round(score)))
 
 
 def _classify_type(
