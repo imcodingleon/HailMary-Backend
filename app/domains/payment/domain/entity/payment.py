@@ -1,0 +1,50 @@
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+from app.domains.payment.domain.value_object.payment_status import (
+    CharacterCode,
+    PaymentStatus,
+)
+
+REVIEW_PERIOD_DAYS = 30
+
+
+@dataclass
+class Payment:
+    """결제 도메인 엔티티 — 토스페이먼츠 승인 결과를 우리 도메인 표현으로."""
+
+    payment_key: str
+    order_id: str
+    character: CharacterCode
+    amount: int
+    status: PaymentStatus
+    customer_email: str
+    approved_at: datetime
+    expires_at: datetime
+    id: int | None = None
+
+    @classmethod
+    def from_approval(
+        cls,
+        *,
+        payment_key: str,
+        order_id: str,
+        character: CharacterCode,
+        amount: int,
+        status: PaymentStatus,
+        customer_email: str,
+        approved_at: datetime,
+    ) -> "Payment":
+        return cls(
+            payment_key=payment_key,
+            order_id=order_id,
+            character=character,
+            amount=amount,
+            status=status,
+            customer_email=customer_email,
+            approved_at=approved_at,
+            expires_at=approved_at + timedelta(days=REVIEW_PERIOD_DAYS),
+        )
+
+    def is_active(self, now: datetime) -> bool:
+        return self.status == PaymentStatus.DONE and now < self.expires_at

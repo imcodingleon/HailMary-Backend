@@ -4,6 +4,19 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.payment.adapter.inbound.api.payment_router import (
+    get_confirm_payment_usecase,
+)
+from app.domains.payment.adapter.inbound.api.payment_router import (
+    router as payment_router,
+)
+from app.domains.payment.adapter.outbound.external.toss_client import TossPaymentsClient
+from app.domains.payment.adapter.outbound.persistence.payment_repository import (
+    PaymentRepository,
+)
+from app.domains.payment.application.usecase.confirm_payment_usecase import (
+    ConfirmPaymentUseCase,
+)
 from app.domains.user.adapter.inbound.api.auth import get_user_repository
 from app.domains.user.adapter.inbound.api.user_router import (
     get_free_result_usecase,
@@ -117,14 +130,33 @@ def _make_get_free_result_usecase(
     )
 
 
+# ── Payment Domain UseCase 팩토리 ────────────────────────────────────────────
+
+def _make_confirm_payment_usecase(
+    session: AsyncSession = Depends(_get_session),
+) -> ConfirmPaymentUseCase:
+    if not _settings.toss_secret_key:
+        raise RuntimeError("TOSS_SECRET_KEY 환경변수가 설정되지 않았습니다.")
+    gateway = TossPaymentsClient(
+        secret_key=_settings.toss_secret_key,
+        base_url=_settings.toss_base_url,
+    )
+    return ConfirmPaymentUseCase(
+        gateway=gateway,
+        repo=PaymentRepository(session),
+    )
+
+
 # ── 의존성 오버라이드 ──────────────────────────────────────────────────────────
 
 app.dependency_overrides[get_user_repository] = _make_user_repository
 app.dependency_overrides[get_submit_user_info_usecase] = _make_submit_user_info_usecase
 app.dependency_overrides[get_submit_survey_usecase] = _make_submit_survey_usecase
 app.dependency_overrides[get_free_result_usecase] = _make_get_free_result_usecase
+app.dependency_overrides[get_confirm_payment_usecase] = _make_confirm_payment_usecase
 
 app.include_router(user_router)
+app.include_router(payment_router)
 
 
 @app.get("/health")

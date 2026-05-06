@@ -1,3 +1,4 @@
+from app.domains.payment.infrastructure.orm.payment_orm import PaymentORM  # noqa: F401
 from app.domains.user.infrastructure.orm.saju_result_orm import SajuResultORM  # noqa: F401
 from app.domains.user.infrastructure.orm.survey_orm import SurveyORM  # noqa: F401
 
