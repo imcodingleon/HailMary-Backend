@@ -31,8 +31,9 @@ env/
 *.swp
 *.swo
 
-# Claude Code (per-user local settings)
+# Claude Code (per-user local settings, runtime locks)
 .claude/settings.local.json
+.claude/*.lock
 
 # Testing
 .pytest_cache/
