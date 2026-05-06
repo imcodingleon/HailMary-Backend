@@ -53,6 +53,7 @@ class SubmitUserInfoUseCase:
             gender=request.gender,
             name=request.name,
             session_token=session_token,
+            character_id=request.character_id,
         )
         saved_user = await self._user_repo.save(user)
         assert saved_user.id is not None
