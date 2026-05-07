@@ -14,6 +14,7 @@ class UserRepository:
         orm = UserMapper.to_orm(user)
         self._session.add(orm)
         await self._session.flush()
+        await self._session.refresh(orm)
         return UserMapper.to_entity(orm)
 
     async def find_by_id(self, user_id: int) -> User | None:
