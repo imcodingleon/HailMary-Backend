@@ -4,6 +4,21 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.ai.adapter.inbound.api.paid_report_router import (
+    get_paid_report_usecase,
+)
+from app.domains.ai.adapter.inbound.api.paid_report_router import (
+    router as paid_report_router,
+)
+from app.domains.ai.adapter.outbound.persistence.paid_report_repository import (
+    PaidReportRepository,
+)
+from app.domains.ai.application.usecase.create_paid_report_usecase import (
+    CreatePaidReportUseCase,
+)
+from app.domains.ai.application.usecase.get_paid_report_usecase import (
+    GetPaidReportUseCase,
+)
 from app.domains.payment.adapter.inbound.api.payment_router import (
     get_confirm_payment_usecase,
 )
@@ -14,6 +29,7 @@ from app.domains.payment.adapter.outbound.external.toss_client import TossPaymen
 from app.domains.payment.adapter.outbound.persistence.payment_repository import (
     PaymentRepository,
 )
+from app.domains.payment.adapter.outbound.saju_hash_resolver import SajuHashResolver
 from app.domains.payment.application.usecase.confirm_payment_usecase import (
     ConfirmPaymentUseCase,
 )
@@ -141,9 +157,30 @@ def _make_confirm_payment_usecase(
         secret_key=_settings.toss_secret_key,
         base_url=_settings.toss_base_url,
     )
+    paid_report_repo = PaidReportRepository(session)
+    create_paid_report_usecase = CreatePaidReportUseCase(
+        paid_report_repo=paid_report_repo,
+    )
+    saju_hash_resolver = SajuHashResolver(
+        user_repo=UserRepository(session),
+        saju_result_repo=SajuResultRepository(session),
+    )
     return ConfirmPaymentUseCase(
         gateway=gateway,
         repo=PaymentRepository(session),
+        paid_report_creator=create_paid_report_usecase,
+        saju_hash_resolver=saju_hash_resolver,
+    )
+
+
+# ── AI Domain UseCase 팩토리 ──────────────────────────────────────────────────
+
+def _make_get_paid_report_usecase(
+    session: AsyncSession = Depends(_get_session),
+) -> GetPaidReportUseCase:
+    return GetPaidReportUseCase(
+        paid_report_repo=PaidReportRepository(session),
+        payment_repo=PaymentRepository(session),
     )
 
 
@@ -154,9 +191,11 @@ app.dependency_overrides[get_submit_user_info_usecase] = _make_submit_user_info_
 app.dependency_overrides[get_submit_survey_usecase] = _make_submit_survey_usecase
 app.dependency_overrides[get_free_result_usecase] = _make_get_free_result_usecase
 app.dependency_overrides[get_confirm_payment_usecase] = _make_confirm_payment_usecase
+app.dependency_overrides[get_paid_report_usecase] = _make_get_paid_report_usecase
 
 app.include_router(user_router)
 app.include_router(payment_router)
+app.include_router(paid_report_router)
 
 
 @app.get("/health")

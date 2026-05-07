@@ -15,6 +15,7 @@ class Payment:
 
     payment_key: str
     order_id: str
+    user_id: int
     character: CharacterCode
     amount: int
     status: PaymentStatus
@@ -29,6 +30,7 @@ class Payment:
         *,
         payment_key: str,
         order_id: str,
+        user_id: int,
         character: CharacterCode,
         amount: int,
         status: PaymentStatus,
@@ -38,6 +40,7 @@ class Payment:
         return cls(
             payment_key=payment_key,
             order_id=order_id,
+            user_id=user_id,
             character=character,
             amount=amount,
             status=status,

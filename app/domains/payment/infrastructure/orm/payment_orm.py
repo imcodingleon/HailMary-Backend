@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, Integer, String
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domains.payment.domain.value_object.payment_status import (
@@ -16,6 +16,9 @@ class PaymentORM(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     payment_key: Mapped[str] = mapped_column(String(200), nullable=False, unique=True, index=True)
     order_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
     character: Mapped[CharacterCode] = mapped_column(
         Enum(CharacterCode, values_callable=lambda e: [x.value for x in e]),
         nullable=False,

@@ -13,8 +13,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # ORM 모델 전체 로드 (Base.metadata 자동 탐색)
-from app.infrastructure.database.base import Base  # noqa: E402
 from app.infrastructure.config.settings import get_settings  # noqa: E402
+from app.infrastructure.database.base import Base  # noqa: E402
 
 target_metadata = Base.metadata
 
