@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Any
 
 from app.domains.payment.application.request.confirm_payment_request import (
     ConfirmPaymentRequest,
@@ -12,7 +13,10 @@ from app.domains.payment.domain.port.payment_gateway_port import (
 from app.domains.payment.domain.port.payment_repository_port import (
     PaymentRepositoryPort,
 )
-from app.domains.payment.domain.value_object.payment_status import PaymentStatus
+from app.domains.payment.domain.value_object.payment_status import (
+    PaymentMethod,
+    PaymentStatus,
+)
 
 
 class ConfirmPaymentUseCase:
@@ -61,6 +65,8 @@ class ConfirmPaymentUseCase:
             else datetime.now(timezone.utc)
         )
 
+        method_info = _extract_method_info(result)
+
         # 4. 도메인 엔티티 → 영속화
         payment = Payment.from_approval(
             payment_key=request.payment_key,
@@ -70,6 +76,10 @@ class ConfirmPaymentUseCase:
             status=status,
             customer_email=request.customer_email,
             approved_at=approved_at,
+            method=method_info["method"],
+            easy_pay_provider=method_info["easy_pay_provider"],
+            card_issuer_code=method_info["card_issuer_code"],
+            bank_code=method_info["bank_code"],
         )
         saved = await self._repo.save(payment)
         return _to_response(saved)
@@ -97,6 +107,29 @@ def _parse_iso8601(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
+def _extract_method_info(result: dict[str, Any]) -> dict[str, Any]:
+    """토스 응답에서 결제수단 부가정보 추출. 누락 필드는 None."""
+    method = PaymentMethod.from_toss(result.get("method"))
+
+    easy_pay = result.get("easyPay")
+    easy_pay_provider = (
+        easy_pay.get("provider") if isinstance(easy_pay, dict) else None
+    )
+
+    card = result.get("card")
+    card_issuer_code = card.get("issuerCode") if isinstance(card, dict) else None
+
+    transfer = result.get("transfer")
+    bank_code = transfer.get("bankCode") if isinstance(transfer, dict) else None
+
+    return {
+        "method": method,
+        "easy_pay_provider": easy_pay_provider,
+        "card_issuer_code": card_issuer_code,
+        "bank_code": bank_code,
+    }
+
+
 def _to_response(payment: Payment) -> PaymentResponse:
     return PaymentResponse(
         paymentKey=payment.payment_key,
@@ -106,4 +139,8 @@ def _to_response(payment: Payment) -> PaymentResponse:
         status=payment.status.value,
         approvedAt=payment.approved_at,
         expiresAt=payment.expires_at,
+        paymentMethod=payment.method.value if payment.method else None,
+        easyPayProvider=payment.easy_pay_provider,
+        cardIssuerCode=payment.card_issuer_code,
+        bankCode=payment.bank_code,
     )

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domains.payment.domain.value_object.payment_status import (
     CharacterCode,
+    PaymentMethod,
     PaymentStatus,
 )
 from app.infrastructure.database.session import Base
@@ -28,3 +29,10 @@ class PaymentORM(Base):
     customer_email: Mapped[str] = mapped_column(String(254), nullable=False)
     approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    method: Mapped[PaymentMethod | None] = mapped_column(
+        Enum(PaymentMethod, values_callable=lambda e: [x.value for x in e]),
+        nullable=True,
+    )
+    easy_pay_provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    card_issuer_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    bank_code: Mapped[str | None] = mapped_column(String(8), nullable=True)

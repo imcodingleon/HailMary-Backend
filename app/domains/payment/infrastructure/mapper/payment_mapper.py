@@ -15,6 +15,10 @@ class PaymentMapper:
             customer_email=entity.customer_email,
             approved_at=entity.approved_at,
             expires_at=entity.expires_at,
+            method=entity.method,
+            easy_pay_provider=entity.easy_pay_provider,
+            card_issuer_code=entity.card_issuer_code,
+            bank_code=entity.bank_code,
         )
 
     @staticmethod
@@ -29,4 +33,8 @@ class PaymentMapper:
             customer_email=orm.customer_email,
             approved_at=orm.approved_at,
             expires_at=orm.expires_at,
+            method=orm.method,
+            easy_pay_provider=orm.easy_pay_provider,
+            card_issuer_code=orm.card_issuer_code,
+            bank_code=orm.bank_code,
         )
