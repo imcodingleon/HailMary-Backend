@@ -45,8 +45,7 @@ htmlcov/
 # Alembic
 alembic/versions/*.pyc
 
-# FortuneTeller (별도 레포, 각자 클론)
-fortuneteller-main/
+# FortuneTeller: 백엔드 레포 통합. 빌드 산출물·노드 모듈은 fortuneteller-main/.gitignore 에서 처리.
 
 # 로컬 테스트 결과 문서
 docs/db-test-result.md

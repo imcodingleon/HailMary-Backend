@@ -1,0 +1,142 @@
+name: Deploy FortuneTeller Lambda
+
+# 트리거: fortuneteller-main 하위 코드 변경 시 + 수동 실행
+# 백엔드 deploy.yml 과 독립. 백엔드 EC2 와 FortuneTeller Lambda 는 별도 인프라.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "fortuneteller-main/src/**"
+      - "fortuneteller-main/tests/**"
+      - "fortuneteller-main/package.json"
+      - "fortuneteller-main/package-lock.json"
+      - "fortuneteller-main/tsconfig.json"
+      - "fortuneteller-main/Dockerfile"
+      - ".github/workflows/deploy-fortuneteller.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: fortuneteller-deploy
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REGISTRY: 536300832957.dkr.ecr.ap-northeast-2.amazonaws.com
+  ECR_REPOSITORY: fortuneteller
+  LAMBDA_FUNCTION_NAME: fortuneteller
+  LAMBDA_FUNCTION_URL: https://jisp5bd4abfsjxrraddczkeyv40fldfh.lambda-url.ap-northeast-2.on.aws
+  WORKDIR: fortuneteller-main
+
+jobs:
+  test:
+    name: Test (lint + jest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fortuneteller-main
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: fortuneteller-main/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+  deploy:
+    name: Build & Push to ECR + Update Lambda
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" | \
+            docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+      - name: Set up QEMU (for ARM64 cross-build)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image (arm64 + Lambda compatible)
+        # --provenance=false --sbom=false: Lambda 가 OCI v1.1 attestation manifest 거부
+        # 하는 이슈 대응 (DEPLOY.md Troubleshooting 2026-05-04)
+        working-directory: fortuneteller-main
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          docker buildx build \
+            --provenance=false \
+            --sbom=false \
+            --platform linux/arm64 \
+            --tag "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            --tag "$ECR_REGISTRY/$ECR_REPOSITORY:latest" \
+            --push \
+            .
+
+      - name: Update Lambda function code
+        run: |
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --image-uri "$IMAGE_URI" \
+            --region "$AWS_REGION" \
+            > /dev/null
+
+      - name: Wait for Lambda update completion
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "$AWS_REGION"
+
+      - name: Smoke test (AuthType IAM 검증)
+        # AuthType=AWS_IAM 이라 unsigned 호출은 403 이 정상. 200/5xx 면 비정상.
+        run: |
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" "$LAMBDA_FUNCTION_URL/health" || echo "000")
+          echo "Unsigned probe response: $CODE"
+          case "$CODE" in
+            403)
+              echo "✅ Lambda alive, AuthType IAM enforced (403 for unsigned)"
+              ;;
+            200)
+              echo "::warning::AuthType이 NONE 일 가능성 — 보안 점검 필요"
+              ;;
+            *)
+              echo "::error::Lambda 비정상 응답: $CODE"
+              exit 1
+              ;;
+          esac
+
+      - name: Print image digest
+        run: |
+          DIGEST=$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=${{ github.sha }}" \
+            --region "$AWS_REGION" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)
+          echo "Deployed image digest: $DIGEST"
