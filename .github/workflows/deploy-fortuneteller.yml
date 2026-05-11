@@ -31,6 +31,10 @@ jobs:
   test:
     name: Test (lint + jest)
     runs-on: ubuntu-latest
+    # FortuneTeller 는 한국 시간 기준 사주 계산. solar-terms-verification 테스트가
+    # new Date(y,m,d,h) 를 로컬 타임존으로 해석하므로 KST 필요.
+    env:
+      TZ: Asia/Seoul
     defaults:
       run:
         working-directory: fortuneteller-main
