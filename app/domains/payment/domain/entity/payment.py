@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 from app.domains.payment.domain.value_object.payment_status import (
     CharacterCode,
+    PaymentMethod,
     PaymentStatus,
 )
 
@@ -22,6 +23,10 @@ class Payment:
     customer_email: str
     approved_at: datetime
     expires_at: datetime
+    method: PaymentMethod | None = None
+    easy_pay_provider: str | None = None
+    card_issuer_code: str | None = None
+    bank_code: str | None = None
     id: int | None = None
 
     @classmethod
@@ -36,6 +41,10 @@ class Payment:
         status: PaymentStatus,
         customer_email: str,
         approved_at: datetime,
+        method: PaymentMethod | None = None,
+        easy_pay_provider: str | None = None,
+        card_issuer_code: str | None = None,
+        bank_code: str | None = None,
     ) -> "Payment":
         return cls(
             payment_key=payment_key,
@@ -47,6 +56,10 @@ class Payment:
             customer_email=customer_email,
             approved_at=approved_at,
             expires_at=approved_at + timedelta(days=REVIEW_PERIOD_DAYS),
+            method=method,
+            easy_pay_provider=easy_pay_provider,
+            card_issuer_code=card_issuer_code,
+            bank_code=bank_code,
         )
 
     def is_active(self, now: datetime) -> bool:
