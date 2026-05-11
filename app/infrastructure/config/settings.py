@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # 토스페이먼츠 결제 승인 (백엔드 전용)
     toss_secret_key: str | None = None
     toss_base_url: str = "https://api.tosspayments.com"
+    # Amplitude HTTP API V2 (백엔드 결제 이벤트 발화용)
+    amplitude_api_key: str | None = None
+    amplitude_base_url: str = "https://api2.amplitude.com"
 
     model_config = SettingsConfigDict(
         env_file=".env.local", env_file_encoding="utf-8", extra="ignore"
