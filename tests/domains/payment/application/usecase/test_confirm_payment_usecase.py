@@ -8,6 +8,7 @@
 Mock 전략: 표준 라이브러리 unittest.mock 대신 Port 직접 구현 fake. 의도가 명확하다.
 """
 
+import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
@@ -18,8 +19,10 @@ from app.domains.payment.application.request.confirm_payment_request import (
 )
 from app.domains.payment.application.usecase.confirm_payment_usecase import (
     ConfirmPaymentUseCase,
+    UserLookupPort,
 )
 from app.domains.payment.domain.entity.payment import Payment
+from app.domains.payment.domain.port.analytics_port import AnalyticsPort
 from app.domains.payment.domain.port.payment_gateway_port import (
     PaymentGatewayError,
     PaymentGatewayPort,
@@ -55,6 +58,10 @@ class FakePaymentRepository(PaymentRepositoryPort):
             customer_email=payment.customer_email,
             approved_at=payment.approved_at,
             expires_at=payment.expires_at,
+            method=payment.method,
+            easy_pay_provider=payment.easy_pay_provider,
+            card_issuer_code=payment.card_issuer_code,
+            bank_code=payment.bank_code,
             id=payment.id or len(self._by_order_id) + 1,
         )
         self._by_order_id[payment.order_id] = saved
@@ -94,6 +101,29 @@ class FakePaymentGateway(PaymentGatewayPort):
         return self._response
 
 
+class FakeUserLookup(UserLookupPort):
+    """가짜 user lookup — token → user_id 매핑을 dict로 흉내낸다."""
+
+    def __init__(self, mapping: dict[str, int] | None = None) -> None:
+        self._mapping = mapping if mapping is not None else {"VALID-TOKEN": 42}
+
+    async def find_user_id_by_session_token(self, token: str) -> int | None:
+        return self._mapping.get(token)
+
+
+class FakeAnalytics(AnalyticsPort):
+    """가짜 분석 어댑터 — 호출 인자 보관 + 옵션으로 예외 발생."""
+
+    def __init__(self, *, raise_on_call: bool = False) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._raise = raise_on_call
+
+    async def track_payment_completed(self, **kwargs: Any) -> None:
+        self.calls.append(kwargs)
+        if self._raise:
+            raise RuntimeError("amplitude down")
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -101,7 +131,7 @@ def _request(
     *,
     order_id: str = "ORDER-001",
     payment_key: str = "PKEY-ABC",
-    user_id: int = 42,
+    session_token: str = "VALID-TOKEN",
     amount: int = 19900,
     character: CharacterCode = CharacterCode.YEONWOO,
     customer_email: str = "buyer@example.com",
@@ -109,7 +139,7 @@ def _request(
     return ConfirmPaymentRequest(
         payment_key=payment_key,
         order_id=order_id,
-        user_id=user_id,
+        session_token=session_token,
         amount=amount,
         character=character,
         customer_email=customer_email,
@@ -148,7 +178,9 @@ async def test_idempotent_returns_existing_without_gateway_call() -> None:
     repo = FakePaymentRepository()
     repo.seed(existing)
     gateway = FakePaymentGateway(response={})  # 호출되면 안 되므로 응답 무관
-    usecase = ConfirmPaymentUseCase(gateway=gateway, repo=repo)
+    usecase = ConfirmPaymentUseCase(
+        gateway=gateway, repo=repo, user_lookup=FakeUserLookup()
+    )
 
     response = await usecase.execute(request)
 
@@ -172,13 +204,32 @@ async def test_amount_mismatch_raises_payment_gateway_error() -> None:
             "approvedAt": "2026-05-01T12:00:00+09:00",
         }
     )
-    usecase = ConfirmPaymentUseCase(gateway=gateway, repo=repo)
+    usecase = ConfirmPaymentUseCase(
+        gateway=gateway, repo=repo, user_lookup=FakeUserLookup()
+    )
 
     with pytest.raises(PaymentGatewayError) as exc_info:
         await usecase.execute(request)
 
     assert exc_info.value.code == "AMOUNT_MISMATCH"
     assert repo.save_calls == [], "금액 불일치 시 save 호출 금지"
+
+
+async def test_invalid_session_token_raises_value_error() -> None:
+    """sessionToken이 매핑에 없으면(만료/위조) ValueError. gateway 호출 금지."""
+
+    request = _request(session_token="EXPIRED-OR-FAKE", amount=19900)
+    repo = FakePaymentRepository()
+    gateway = FakePaymentGateway(response={})  # 호출되면 안 됨
+    usecase = ConfirmPaymentUseCase(
+        gateway=gateway, repo=repo, user_lookup=FakeUserLookup()
+    )
+
+    with pytest.raises(ValueError):
+        await usecase.execute(request)
+
+    assert gateway.confirm_calls == [], "유효하지 않은 토큰이면 gateway.confirm 호출 금지"
+    assert repo.save_calls == []
 
 
 async def test_unknown_status_raises_payment_gateway_error() -> None:
@@ -193,10 +244,97 @@ async def test_unknown_status_raises_payment_gateway_error() -> None:
             "approvedAt": "2026-05-01T12:00:00+09:00",
         }
     )
-    usecase = ConfirmPaymentUseCase(gateway=gateway, repo=repo)
+    usecase = ConfirmPaymentUseCase(
+        gateway=gateway, repo=repo, user_lookup=FakeUserLookup()
+    )
 
     with pytest.raises(PaymentGatewayError) as exc_info:
         await usecase.execute(request)
 
     assert exc_info.value.code == "UNKNOWN_STATUS"
     assert repo.save_calls == [], "알 수 없는 status 시 save 호출 금지"
+
+
+async def test_analytics_called_with_payment_details_on_success() -> None:
+    """결제 승인 성공 시 analytics 가 결제 상세를 받아 1회 호출된다."""
+
+    request = ConfirmPaymentRequest(
+        payment_key="PKEY-ANL",
+        order_id="ORDER-ANL",
+        session_token="VALID-TOKEN",
+        amount=20000,
+        character=CharacterCode.YEONWOO,
+        customer_email="buyer@example.com",
+        device_id="dev-xyz",
+        session_id=1746964800000,
+    )
+    repo = FakePaymentRepository()
+    gateway = FakePaymentGateway(
+        response={
+            "status": "DONE",
+            "totalAmount": 20000,
+            "approvedAt": "2026-05-11T20:21:02+09:00",
+            "method": "간편결제",
+            "easyPay": {"provider": "토스페이"},
+        }
+    )
+    analytics = FakeAnalytics()
+    usecase = ConfirmPaymentUseCase(
+        gateway=gateway,
+        repo=repo,
+        user_lookup=FakeUserLookup(),
+        analytics=analytics,
+    )
+
+    response = await usecase.execute(request)
+    # fire-and-forget: create_task 의 코루틴이 완료될 때까지 잠시 대기
+    await asyncio.sleep(0)
+
+    assert response.order_id == "ORDER-ANL"
+    assert len(analytics.calls) == 1, "결제 성공 시 analytics 1회 호출"
+    call = analytics.calls[0]
+    assert call["user_id"] == 42
+    assert call["device_id"] == "dev-xyz"
+    assert call["session_id"] == 1746964800000
+    assert call["order_id"] == "ORDER-ANL"
+    assert call["amount"] == 20000
+    assert call["character"] == "yeonwoo"
+    assert call["method"] == "EASY_PAY"
+    assert call["easy_pay_provider"] == "토스페이"
+    # PII 금지: customer_email 키가 절대 포함되면 안 됨
+    assert "customer_email" not in call
+
+
+async def test_analytics_failure_does_not_break_confirm() -> None:
+    """analytics 가 예외를 던져도 confirm 응답은 정상 — fire-and-forget 검증."""
+
+    request = ConfirmPaymentRequest(
+        payment_key="PKEY-ERR",
+        order_id="ORDER-ERR",
+        session_token="VALID-TOKEN",
+        amount=20000,
+        character=CharacterCode.YEONWOO,
+        customer_email="buyer@example.com",
+    )
+    repo = FakePaymentRepository()
+    gateway = FakePaymentGateway(
+        response={
+            "status": "DONE",
+            "totalAmount": 20000,
+            "approvedAt": "2026-05-11T20:21:02+09:00",
+        }
+    )
+    analytics = FakeAnalytics(raise_on_call=True)
+    usecase = ConfirmPaymentUseCase(
+        gateway=gateway,
+        repo=repo,
+        user_lookup=FakeUserLookup(),
+        analytics=analytics,
+    )
+
+    response = await usecase.execute(request)
+    await asyncio.sleep(0)
+
+    assert response.order_id == "ORDER-ERR"
+    assert response.status == "DONE"
+    assert len(analytics.calls) == 1, "예외 발생해도 호출 시도는 1회 기록"

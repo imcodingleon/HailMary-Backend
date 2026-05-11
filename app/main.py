@@ -25,11 +25,15 @@ from app.domains.payment.adapter.inbound.api.payment_router import (
 from app.domains.payment.adapter.inbound.api.payment_router import (
     router as payment_router,
 )
+from app.domains.payment.adapter.outbound.external.amplitude_adapter import (
+    AmplitudeAnalyticsAdapter,
+)
 from app.domains.payment.adapter.outbound.external.toss_client import TossPaymentsClient
 from app.domains.payment.adapter.outbound.persistence.payment_repository import (
     PaymentRepository,
 )
 from app.domains.payment.adapter.outbound.saju_hash_resolver import SajuHashResolver
+from app.domains.payment.adapter.outbound.user_lookup_adapter import UserLookupAdapter
 from app.domains.payment.application.usecase.confirm_payment_usecase import (
     ConfirmPaymentUseCase,
 )
@@ -59,6 +63,7 @@ from app.domains.user.domain.service.spouse_match_service import SpouseMatchServ
 from app.domains.user.infrastructure.fortuneteller_adapter import FortuneTellerAdapter
 from app.infrastructure.config.settings import get_settings
 from app.infrastructure.database.session import AsyncSessionLocal
+from app.infrastructure.external.amplitude.client import AmplitudeClient
 from app.infrastructure.external.fortuneteller.client import FortuneTellerClient
 
 app = FastAPI(title="HailMary Backend", version="0.1.0")
@@ -161,15 +166,26 @@ def _make_confirm_payment_usecase(
     create_paid_report_usecase = CreatePaidReportUseCase(
         paid_report_repo=paid_report_repo,
     )
+    user_repo = UserRepository(session)
     saju_hash_resolver = SajuHashResolver(
-        user_repo=UserRepository(session),
+        user_repo=user_repo,
         saju_result_repo=SajuResultRepository(session),
+    )
+    user_lookup = UserLookupAdapter(user_repo=user_repo)
+    analytics = AmplitudeAnalyticsAdapter(
+        client=AmplitudeClient(
+            api_key=_settings.amplitude_api_key,
+            base_url=_settings.amplitude_base_url,
+        ),
+        environment=_settings.app_env,
     )
     return ConfirmPaymentUseCase(
         gateway=gateway,
         repo=PaymentRepository(session),
+        user_lookup=user_lookup,
         paid_report_creator=create_paid_report_usecase,
         saju_hash_resolver=saju_hash_resolver,
+        analytics=analytics,
     )
 
 

@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -6,6 +8,7 @@ from app.domains.payment.application.request.confirm_payment_request import (
 )
 from app.domains.payment.application.response.payment_response import PaymentResponse
 from app.domains.payment.domain.entity.payment import Payment
+from app.domains.payment.domain.port.analytics_port import AnalyticsPort
 from app.domains.payment.domain.port.payment_gateway_port import (
     PaymentGatewayError,
     PaymentGatewayPort,
@@ -17,6 +20,8 @@ from app.domains.payment.domain.value_object.payment_status import (
     PaymentMethod,
     PaymentStatus,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PaidReportCreatorPort(Protocol):
@@ -40,18 +45,32 @@ class SajuHashResolverPort(Protocol):
     async def resolve(self, user_id: int) -> str | None: ...
 
 
+class UserLookupPort(Protocol):
+    """sessionToken으로 user_id를 조회하는 hook.
+
+    Hexagonal 룰: payment 도메인은 user 도메인을 직접 import하지 않는다.
+    main.py가 user_repo 기반 어댑터를 주입한다. 토큰이 만료/위조이면 None 반환.
+    """
+
+    async def find_user_id_by_session_token(self, token: str) -> int | None: ...
+
+
 class ConfirmPaymentUseCase:
     def __init__(
         self,
         gateway: PaymentGatewayPort,
         repo: PaymentRepositoryPort,
+        user_lookup: UserLookupPort | None = None,
         paid_report_creator: PaidReportCreatorPort | None = None,
         saju_hash_resolver: SajuHashResolverPort | None = None,
+        analytics: AnalyticsPort | None = None,
     ) -> None:
         self._gateway = gateway
         self._repo = repo
+        self._user_lookup = user_lookup
         self._paid_report_creator = paid_report_creator
         self._saju_hash_resolver = saju_hash_resolver
+        self._analytics = analytics
 
     async def execute(self, request: ConfirmPaymentRequest) -> PaymentResponse:
         # 1. 동일 orderId 중복 승인 방지 — idempotent
@@ -59,7 +78,16 @@ class ConfirmPaymentUseCase:
         if existing is not None:
             return _to_response(existing)
 
-        # 2. 토스 결제 승인 호출
+        # 2. sessionToken → user_id 변환. 만료/위조 토큰이면 400으로 거절.
+        if self._user_lookup is None:
+            raise RuntimeError("UserLookupPort 어댑터가 주입되지 않았습니다.")
+        user_id = await self._user_lookup.find_user_id_by_session_token(
+            request.session_token
+        )
+        if user_id is None:
+            raise ValueError("세션이 만료되었거나 잘못된 토큰입니다.")
+
+        # 3. 토스 결제 승인 호출
         result = await self._gateway.confirm(
             payment_key=request.payment_key,
             order_id=request.order_id,
@@ -96,7 +124,7 @@ class ConfirmPaymentUseCase:
         payment = Payment.from_approval(
             payment_key=request.payment_key,
             order_id=request.order_id,
-            user_id=request.user_id,
+            user_id=user_id,
             character=request.character,
             amount=request.amount,
             status=status,
@@ -121,7 +149,66 @@ class ConfirmPaymentUseCase:
                 saju_hash=saju_hash or saved.order_id,
             )
 
+        # 6. Amplitude 분석 이벤트 발화 (fire-and-forget).
+        # 실패/지연이 결제 응답에 영향을 주면 안 되므로 create_task 로 분리.
+        # PII 정책: customer_email 등은 payload 에 포함 금지 (어댑터의 화이트리스트로 강제).
+        if self._analytics is not None:
+            asyncio.create_task(
+                _safe_track_payment_completed(
+                    analytics=self._analytics,
+                    user_id=saved.user_id,
+                    device_id=request.device_id,
+                    session_id=request.session_id,
+                    order_id=saved.order_id,
+                    character=saved.character.value,
+                    amount=saved.amount,
+                    method=saved.method.value if saved.method else None,
+                    easy_pay_provider=saved.easy_pay_provider,
+                    card_issuer_code=saved.card_issuer_code,
+                    bank_code=saved.bank_code,
+                    approved_at=saved.approved_at,
+                )
+            )
+
         return _to_response(saved)
+
+
+async def _safe_track_payment_completed(
+    *,
+    analytics: AnalyticsPort,
+    user_id: int,
+    device_id: str | None,
+    session_id: int | None,
+    order_id: str,
+    character: str,
+    amount: int,
+    method: str | None,
+    easy_pay_provider: str | None,
+    card_issuer_code: str | None,
+    bank_code: str | None,
+    approved_at: datetime,
+) -> None:
+    """analytics.track_payment_completed 의 모든 예외를 swallow.
+
+    어댑터가 자체적으로 swallow 하지만, asyncio.create_task 가 예외를 unhandled
+    로 만들면 이벤트 루프 경고가 생기므로 한 번 더 감싼다.
+    """
+    try:
+        await analytics.track_payment_completed(
+            user_id=user_id,
+            device_id=device_id,
+            session_id=session_id,
+            order_id=order_id,
+            character=character,
+            amount=amount,
+            method=method,
+            easy_pay_provider=easy_pay_provider,
+            card_issuer_code=card_issuer_code,
+            bank_code=bank_code,
+            approved_at=approved_at,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("analytics.track_payment_completed failed: %s", e)
 
 
 def _read_amount(result: dict) -> int:  # type: ignore[type-arg]
