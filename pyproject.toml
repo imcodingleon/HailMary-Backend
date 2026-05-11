@@ -20,6 +20,7 @@ dependencies = [
     "anthropic>=0.40.0",
     "httpx>=0.27.0",
     "aiohttp>=3.9.0",
+    "boto3>=1.35.0",
 ]
 
 [project.optional-dependencies]
@@ -46,6 +47,11 @@ python_version = "3.12"
 strict = true
 ignore_missing_imports = false
 plugins = ["pydantic.mypy"]
+
+# botocore 는 PyPI 타입 stub 없음 (boto3-stubs는 boto3 표면만 커버). 직접 import 만 ignore.
+[[tool.mypy.overrides]]
+module = ["botocore.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

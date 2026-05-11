@@ -12,13 +12,13 @@ from __future__ import annotations
 from typing import Any, cast
 
 from app.domains.user.domain.value_object.saju_constants import (
-    BRANCH_ELEMENT,
+    BRANCH_ELEMENT,  # noqa: F401  — saju_constants 일관성 검증용 re-export
     EarthlyBranch,
     HeavenlyStem,
     PillarKey,
-    TenGod,
+    TenGod,  # noqa: F401  — saju_constants 일관성 검증용 re-export (type alias)
     TwelvePhase,
-    WuXing,
+    WuXing,  # noqa: F401  — saju_constants 일관성 검증용 re-export (type alias)
     get_twelve_phase,
 )
 
@@ -30,8 +30,9 @@ SCORE_STEM_BONUS: dict[HeavenlyStem, int] = {
     "병": 2, "정": 2, "임": 2, "경": -2, "신": -2,
 }
 
+# v2: mokyok 12 → 8 로 조정. 위치 가중치(MOKYOK_PILLAR_BONUS)와의 이중계산 회피.
 TWELVE_PHASE_SCORE: dict[TwelvePhase, int] = {
-    "mokyok": 12, "jewang": 8, "gwandae": 6, "geonrok": 4,
+    "mokyok": 8, "jewang": 8, "gwandae": 6, "geonrok": 4,
     "jangsaeng": 3, "yang": 2, "tae": 1, "soe": 0,
     "byeong": -2, "sa": -3, "myo": -4, "jeol": -4,
 }
@@ -39,6 +40,55 @@ TWELVE_PHASE_SCORE: dict[TwelvePhase, int] = {
 DOHWA_PILLAR_WEIGHT: dict[PillarKey, int] = {
     "day": 30, "month": 22, "hour": 18, "year": 14,
 }
+
+# v2: 매력 신호 Top 10 — 폴백 판정용 테이블
+HONG_YEOM_TABLE: dict[HeavenlyStem, tuple[EarthlyBranch, ...]] = {
+    "갑": ("오",), "을": ("오", "신"), "병": ("인",), "정": ("미",),
+    "무": ("진",), "기": ("진",), "경": ("술",), "신": ("유",),
+    "임": ("자",), "계": ("신",),
+}
+
+GEUM_YEO_ROK_TABLE: dict[HeavenlyStem, EarthlyBranch] = {
+    "갑": "진", "을": "사", "병": "미", "정": "신", "무": "미",
+    "기": "신", "경": "술", "신": "해", "임": "축", "계": "인",
+}
+
+JA_JWA_HONG_YEOM_ILJU: frozenset[tuple[HeavenlyStem, EarthlyBranch]] = frozenset({
+    ("갑", "오"), ("정", "미"), ("무", "진"), ("기", "진"),
+    ("경", "술"), ("신", "유"), ("임", "자"),
+})
+
+DOHWA_BRANCHES: frozenset[EarthlyBranch] = frozenset({"자", "묘", "오", "유"})
+
+# 목욕 위치별 가중치 (도화 PILLAR_WEIGHT 비례 축소판)
+MOKYOK_PILLAR_BONUS: dict[PillarKey, int] = {
+    "day": 6, "hour": 3, "month": 2, "year": 1,
+}
+
+# 6충 페어 (sin_sal.ts:462 의 chungPairs 와 동일)
+CHUNG_PAIRS: tuple[tuple[EarthlyBranch, EarthlyBranch], ...] = (
+    ("자", "오"), ("축", "미"), ("인", "신"),
+    ("묘", "유"), ("진", "술"), ("사", "해"),
+)
+
+# 화개 그룹 매핑 (sin_sal.ts checkHwaGaeSal 과 동일)
+HWA_GAE_GROUPS: tuple[tuple[frozenset[EarthlyBranch], EarthlyBranch], ...] = (
+    (frozenset({"인", "오", "술"}), "술"),
+    (frozenset({"사", "유", "축"}), "축"),
+    (frozenset({"신", "자", "진"}), "진"),
+    (frozenset({"해", "묘", "미"}), "미"),
+)
+
+# 천을귀인 일간별 지지표 (sin_sal.ts CHEON_EUL_GWI_IN_TABLE 과 동일)
+CHEON_EUL_TABLE: dict[HeavenlyStem, tuple[EarthlyBranch, ...]] = {
+    "갑": ("축", "미"), "을": ("자", "신"),
+    "병": ("해", "유"), "정": ("해", "유"),
+    "무": ("축", "미"), "기": ("자", "신"),
+    "경": ("축", "미"), "신": ("인", "오"),
+    "임": ("사", "묘"), "계": ("사", "묘"),
+}
+
+V2_BONUS_CAP: int = 30
 
 PERCENTILE_TABLE: tuple[tuple[int, int], ...] = (
     (0, 0), (10, 5), (20, 10), (28, 15), (34, 20), (40, 28),
@@ -88,6 +138,151 @@ def _find_dohwa_pillars(saju: dict[str, Any]) -> list[PillarKey]:
     return result
 
 
+# ── v2 매력 신호 폴백 헬퍼 ──────────────────────────────────────────────────
+# FortuneTeller가 sinSals/charmFlags 에 값을 안 보낸 경우 8자(stem/branch)에서
+# 즉시 판정. FortuneTeller가 이미 보냈으면 그대로 신뢰(_augment_charm_signals
+# 가 덮어쓰지 않음).
+
+
+def _has_hong_yeom(saju: dict[str, Any]) -> bool:
+    day_stem = cast(HeavenlyStem, saju["day"]["stem"])
+    targets = HONG_YEOM_TABLE.get(day_stem, ())
+    branches = _branch_map(saju).values()
+    return any(b in targets for b in branches)
+
+
+def _has_geum_yeo_rok(saju: dict[str, Any]) -> bool:
+    day_stem = cast(HeavenlyStem, saju["day"]["stem"])
+    target = GEUM_YEO_ROK_TABLE.get(day_stem)
+    if target is None:
+        return False
+    return target in _branch_map(saju).values()
+
+
+def _is_ja_jwa_hong_yeom(saju: dict[str, Any]) -> bool:
+    day_stem = cast(HeavenlyStem, saju["day"]["stem"])
+    day_branch = cast(EarthlyBranch, saju["day"]["branch"])
+    return (day_stem, day_branch) in JA_JWA_HONG_YEOM_ILJU
+
+
+def _is_dohwa_ilju(saju: dict[str, Any]) -> bool:
+    day_branch = cast(EarthlyBranch, saju["day"]["branch"])
+    return day_branch in DOHWA_BRANCHES
+
+
+def _mokyok_pillars(saju: dict[str, Any]) -> list[PillarKey]:
+    day_stem = cast(HeavenlyStem, saju["day"]["stem"])
+    result: list[PillarKey] = []
+    for k in PILLAR_KEYS:
+        b = cast(EarthlyBranch, saju[k]["branch"])
+        if get_twelve_phase(day_stem, b) == "mokyok":
+            result.append(k)
+    return result
+
+
+def _dohwa_chung_pillars(
+    saju: dict[str, Any], dohwa_pillars: list[PillarKey]
+) -> list[PillarKey]:
+    """도화 지지가 6충 페어의 한쪽으로 사주 안에 동시 존재 시 해당 도화 기둥 반환."""
+    if not dohwa_pillars:
+        return []
+    branch_map = _branch_map(saju)
+    all_branches = set(branch_map.values())
+    result: list[PillarKey] = []
+    for k in dohwa_pillars:
+        b = branch_map[k]
+        for a, c in CHUNG_PAIRS:
+            partner: EarthlyBranch | None = None
+            if b == a:
+                partner = c
+            elif b == c:
+                partner = a
+            if partner is not None and partner in all_branches:
+                result.append(k)
+                break
+    return result
+
+
+def _has_dohwa_via_groups(saju: dict[str, Any]) -> bool:
+    """sin_sal.ts checkDoHwaSal 동등. sinSals 의존 없이 8자만으로 판정."""
+    branch_map = _branch_map(saju)
+    all_branches = set(branch_map.values())
+    for group_set, dohwa in THREE_HARMONY_DOHWA:
+        if any(b in all_branches for b in group_set) and dohwa in all_branches:
+            return True
+    return False
+
+
+def _has_hwa_gae_via_groups(saju: dict[str, Any]) -> bool:
+    """sin_sal.ts checkHwaGaeSal 동등."""
+    branch_map = _branch_map(saju)
+    all_branches = set(branch_map.values())
+    for group_set, hwa_gae in HWA_GAE_GROUPS:
+        if any(b in all_branches for b in group_set) and hwa_gae in all_branches:
+            return True
+    return False
+
+
+def _has_gong_mang_via_table(saju: dict[str, Any]) -> bool:
+    """sin_sal.ts checkGongMang 동등."""
+    day_branch = cast(EarthlyBranch, saju["day"]["branch"])
+    targets = set(GONG_MANG_TABLE.get(day_branch, ()))
+    return any(b in targets for b in _branch_map(saju).values())
+
+
+def _has_cheon_eul_via_table(saju: dict[str, Any]) -> bool:
+    """sin_sal.ts CHEON_EUL_GWI_IN_TABLE 동등."""
+    day_stem = cast(HeavenlyStem, saju["day"]["stem"])
+    targets = CHEON_EUL_TABLE.get(day_stem, ())
+    return any(b in targets for b in _branch_map(saju).values())
+
+
+def _augment_charm_signals(saju: dict[str, Any]) -> dict[str, Any]:
+    """FortuneTeller 응답에 v2 매력 신호가 누락된 경우 백엔드에서 폴백 보강.
+
+    - FortuneTeller가 보낸 sinSals/charmFlags 는 신뢰(덮어쓰지 않음)
+    - 입력 dict 는 변형하지 않음 (얕은 복사 후 반환)
+    - 매력 점수에 영향 주는 신살 전부 폴백 처리하여 폴백 동등성 보장
+    """
+    out = dict(saju)
+    sin_sals = list(out.get("sinSals") or [])
+    sin_sals_set = set(sin_sals)
+    # v1 신살 폴백 (기존 산식 영향 신호) — FortuneTeller 미제공 시에만 채움
+    if "do_hwa_sal" not in sin_sals_set and _has_dohwa_via_groups(saju):
+        sin_sals.append("do_hwa_sal")
+        sin_sals_set.add("do_hwa_sal")
+    if "hwa_gae_sal" not in sin_sals_set and _has_hwa_gae_via_groups(saju):
+        sin_sals.append("hwa_gae_sal")
+        sin_sals_set.add("hwa_gae_sal")
+    if "gong_mang" not in sin_sals_set and _has_gong_mang_via_table(saju):
+        sin_sals.append("gong_mang")
+        sin_sals_set.add("gong_mang")
+    if "cheon_eul_gwi_in" not in sin_sals_set and _has_cheon_eul_via_table(saju):
+        sin_sals.append("cheon_eul_gwi_in")
+        sin_sals_set.add("cheon_eul_gwi_in")
+    # v2 신규 신살 폴백
+    if "hong_yeom_sal" not in sin_sals_set and _has_hong_yeom(saju):
+        sin_sals.append("hong_yeom_sal")
+        sin_sals_set.add("hong_yeom_sal")
+    if "geum_yeo_rok" not in sin_sals_set and _has_geum_yeo_rok(saju):
+        sin_sals.append("geum_yeo_rok")
+        sin_sals_set.add("geum_yeo_rok")
+    if "ja_jwa_hong_yeom" not in sin_sals_set and _is_ja_jwa_hong_yeom(saju):
+        sin_sals.append("ja_jwa_hong_yeom")
+        sin_sals_set.add("ja_jwa_hong_yeom")
+    out["sinSals"] = sin_sals
+
+    charm_flags = dict(out.get("charmFlags") or {})
+    charm_flags.setdefault("dohwaIlju", _is_dohwa_ilju(saju))
+    charm_flags.setdefault("jaJwaHongYeom", _is_ja_jwa_hong_yeom(saju))
+    has_dohwa = "do_hwa_sal" in sin_sals_set
+    has_hong = "hong_yeom_sal" in sin_sals_set
+    charm_flags.setdefault("hongYeomDohwaSynergy", has_dohwa and has_hong)
+    charm_flags.setdefault("mokyokPillars", _mokyok_pillars(saju))
+    out["charmFlags"] = charm_flags
+    return out
+
+
 def _count_ten_god_groups(saju: dict[str, Any]) -> dict[str, int]:
     dist = saju.get("tenGodsDistribution") or {}
     return {
@@ -131,6 +326,61 @@ def _lookup_percentile(score: int) -> int:
     return pct
 
 
+def _calculate_v2_bonus(
+    saju: dict[str, Any], dohwa_pillars: list[PillarKey]
+) -> float:
+    """Top 10 매력 신호 가산. _augment_charm_signals 통과 후 호출 가정."""
+    bonus = 0.0
+    sin_sals = saju.get("sinSals") or []
+    charm_flags = saju.get("charmFlags") or {}
+
+    # 1. 홍염살
+    if "hong_yeom_sal" in sin_sals:
+        bonus += 10
+
+    # 2. 자좌홍염 일주 (홍염살에 누적되는 추가 가산 — 일주 자체가 매력)
+    if charm_flags.get("jaJwaHongYeom"):
+        bonus += 6
+
+    # 3. 천을귀인 — 매력 가산은 약하게 (귀인성 ≠ 매력 그 자체)
+    if "cheon_eul_gwi_in" in sin_sals:
+        bonus += 4
+
+    # 4. 도화일주 — 일지 자체가 도화 지지(자/묘/오/유). 기존 _find_dohwa_pillars
+    # 의 삼합 그룹 판정에서 누락되는 케이스를 흡수.
+    if charm_flags.get("dohwaIlju"):
+        bonus += 8
+
+    # 5. 홍염×도화 시너지
+    if charm_flags.get("hongYeomDohwaSynergy"):
+        bonus += 5
+
+    # 6. 도화 충 페널티 (합은 도화 PILLAR_WEIGHT 자체에 반영되므로 별도 가산 X)
+    if _dohwa_chung_pillars(saju, dohwa_pillars):
+        bonus -= 3
+
+    # 7. 목욕 위치 가중 (TWELVE_PHASE_SCORE['mokyok']=8 과 분리된 보너스)
+    for k in charm_flags.get("mokyokPillars") or []:
+        bonus += MOKYOK_PILLAR_BONUS.get(k, 0)
+
+    # 8. 금여록
+    if "geum_yeo_rok" in sin_sals:
+        bonus += 3
+
+    # 9. 편관·식상×도화 격국 (이성운 격국)
+    dist = saju.get("tenGodsDistribution") or {}
+    pyeongwan = dist.get("편관", 0)
+    siksang = dist.get("식신", 0) + dist.get("상관", 0)
+    if pyeongwan >= 2 and siksang >= 2 and dohwa_pillars:
+        bonus += 6
+
+    # 10. 공망 ∩ 매력살 페널티 확장 — 도화는 기존 -10 그대로, 홍염은 추가 -4
+    if "gong_mang" in sin_sals and "hong_yeom_sal" in sin_sals:
+        bonus -= 4
+
+    return bonus
+
+
 def _calculate_score(saju: dict[str, Any], dohwa_pillars: list[PillarKey]) -> int:
     score = 0.0
 
@@ -162,6 +412,10 @@ def _calculate_score(saju: dict[str, Any], dohwa_pillars: list[PillarKey]) -> in
 
     if _is_dohwa_in_gong_mang(saju, dohwa_pillars):
         score -= 10
+
+    # v2: Top 10 매력 신호 가산 (cap +30 으로 인플레이션 방지)
+    v2_bonus = _calculate_v2_bonus(saju, dohwa_pillars)
+    score += min(V2_BONUS_CAP, v2_bonus)
 
     # 서비스 UX: 매우 낮은 매력 점수가 사용자에게 부정적으로 비춰지는 것을 방지하기 위해
     # 최저값을 20으로 floor 적용 (21점 이상 사용자는 자연 분포 유지).
@@ -303,6 +557,9 @@ class CharmService:
     """SajuData(dict) → CharmView(dict, camelCase)."""
 
     def calculate(self, saju: dict[str, Any]) -> dict[str, Any]:
+        # v2: FortuneTeller 미보유 매력 신호 폴백 보강.
+        # FortuneTeller 가 이미 보낸 sinSals/charmFlags 값은 덮어쓰지 않음.
+        saju = _augment_charm_signals(saju)
         dohwa_pillars = _find_dohwa_pillars(saju)
         groups = _count_ten_god_groups(saju)
         type_key = _classify_type(saju, dohwa_pillars, groups)
@@ -320,6 +577,7 @@ class CharmService:
             if primary_pillar is None:
                 primary_pillar = dohwa_pillars[0]
 
+        dohwa: dict[str, Any]
         if primary_pillar is None:
             dohwa = {"present": False, "pillar": None, "hanja": None}
         else:
@@ -337,8 +595,5 @@ class CharmService:
         }
 
 
-# BRANCH_ELEMENT 는 이 파일에서 직접 쓰지 않지만 saju_constants 의 일관성 검증을
-# 위해 import 하여 lint pass — type checker 가 남아있는 import 를 검출하면 유지.
-_ = BRANCH_ELEMENT
-_ = WuXing
-_ = TenGod
+# BRANCH_ELEMENT / WuXing / TenGod 은 본 파일에서 직접 쓰지 않지만 saju_constants
+# 의 일관성 검증 의도로 import 만 유지. F401 은 import 라인의 noqa 로 처리.
