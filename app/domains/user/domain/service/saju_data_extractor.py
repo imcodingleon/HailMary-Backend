@@ -49,6 +49,7 @@ class SajuDataExtractor:
             OHANG_EXCESS: 비율 max인 오행 한글 1글자
             OHANG_LACK: 비율 min인 오행 한글 1글자
             ILGAN: 일간 한글 풀네임 (10종 중 하나, 예: "임수")
+            ILJU: 일주 한글 (천간+지지, 예: "임술")
 
         누락된 raw 필드는 빈 문자열로 채우거나 기본값으로 둔다.
         개인정보(생년월일·이름·성별)는 결과에 포함하지 않는다.
@@ -64,7 +65,9 @@ class SajuDataExtractor:
         excess, lack = _ohang_excess_lack(ratios)
 
         day_stem = str(day.get("stem", ""))
+        day_branch = str(day.get("branch", ""))
         ilgan = _STEM_TO_ILGAN.get(day_stem, "")
+        ilju = day_stem + day_branch if day_stem and day_branch else ""
 
         return {
             "SI_G": _stem_hanja(hour),
@@ -83,6 +86,7 @@ class SajuDataExtractor:
             "OHANG_EXCESS": excess,
             "OHANG_LACK": lack,
             "ILGAN": ilgan,
+            "ILJU": ilju,
         }
 
 

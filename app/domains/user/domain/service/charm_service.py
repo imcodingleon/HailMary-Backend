@@ -594,6 +594,34 @@ class CharmService:
             "dohwa": dohwa,
         }
 
+    def get_user_charm_sals(self, saju: dict[str, Any]) -> list[str]:
+        """사주에서 보유 매력살 키 리스트 반환 (P-5 유료 페이지 표시용).
+
+        키는 `value_object/charm_sals.py` CHARM_SALS dict와 매칭:
+          - do_hwa_sal / hong_yeom_sal / cheon_eul_gwi_in
+          - hwa_gae_sal / geum_yeo_rok / gong_mang
+
+        Returns: 보유한 매력살 키 list (0~6개). 우선순위 순서는 SAL_PRIORITY 따름.
+        """
+        saju = _augment_charm_signals(saju)
+
+        present: list[str] = []
+        # 우선순위 순서 (가장 귀한 매력살 먼저)
+        if _has_cheon_eul_via_table(saju):
+            present.append("cheon_eul_gwi_in")
+        if _has_hong_yeom(saju):
+            present.append("hong_yeom_sal")
+        if _find_dohwa_pillars(saju) or _has_dohwa_via_groups(saju):
+            present.append("do_hwa_sal")
+        if _has_geum_yeo_rok(saju):
+            present.append("geum_yeo_rok")
+        if _has_hwa_gae_via_groups(saju):
+            present.append("hwa_gae_sal")
+        if _has_gong_mang_via_table(saju):
+            present.append("gong_mang")
+
+        return present
+
 
 # BRANCH_ELEMENT / WuXing / TenGod 은 본 파일에서 직접 쓰지 않지만 saju_constants
 # 의 일관성 검증 의도로 import 만 유지. F401 은 import 라인의 noqa 로 처리.
