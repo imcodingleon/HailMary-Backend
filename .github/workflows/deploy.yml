@@ -46,6 +46,8 @@ jobs:
           FORTUNETELLER_URL=${{ secrets.FORTUNETELLER_URL }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           TOSS_SECRET_KEY=${{ secrets.TOSS_SECRET_KEY }}
+          AMPLITUDE_API_KEY=${{ secrets.AMPLITUDE_API_KEY }}
+          AMPLITUDE_BASE_URL=${{ secrets.AMPLITUDE_BASE_URL }}
           EOF
 
       - name: Install dependencies (uv sync)
