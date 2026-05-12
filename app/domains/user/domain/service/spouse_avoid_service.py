@@ -39,12 +39,19 @@ class SpouseAvoidService:
 
     def calculate(self, saju: dict[str, Any]) -> dict[str, Any]:
         avoid_element = _resolve_avoid_element(saju)
-        if not avoid_element:
-            return {"slotId": "neutral", "avoidElement": None, "avoidYinYang": None}
-
-        avoid_yin_yang = cast(YinYang, saju["day"]["yinYang"])
         gender = saju.get("gender", "female")
         opposite_gender = "f" if gender == "male" else "m"
+
+        # yongSin / day.stemElement 둘 다 비면 성별 기반 neutral fallback
+        # (spouse_match와 동일한 `{m|f}-neutral` 패턴).
+        if not avoid_element:
+            return {
+                "slotId": f"{opposite_gender}-neutral",
+                "avoidElement": None,
+                "avoidYinYang": None,
+            }
+
+        avoid_yin_yang = cast(YinYang, saju["day"]["yinYang"])
         slot_id = (
             f"{opposite_gender}-{ELEMENT_PREFIX[avoid_element]}-"
             f"{YIN_YANG_SLUG[avoid_yin_yang]}"

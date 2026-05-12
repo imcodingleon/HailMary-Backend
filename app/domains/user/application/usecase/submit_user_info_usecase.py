@@ -69,9 +69,10 @@ class SubmitUserInfoUseCase:
         await self._saju_result_repo.save(saju_result)
 
         time_unknown = birth_info.birth_time_unknown
-        # FortuneTeller 응답에 gender 가 비어 있을 수 있으므로 도메인 값으로 보강
+        # FortuneTeller 응답의 gender 형식("M"/"남" 등)이 다를 수 있어 도메인 값("male"/"female")으로 강제.
+        # spouse_avoid/match가 `gender == "male"`로 비교하므로 SSOT를 User 엔티티로 통일한다.
         analysis_input = dict(ft_response)
-        analysis_input.setdefault("gender", saved_user.gender.value)
+        analysis_input["gender"] = saved_user.gender.value
 
         return build_free_result_response(
             session_token=saved_user.session_token,

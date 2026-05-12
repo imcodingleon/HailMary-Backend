@@ -34,8 +34,10 @@ class GetFreeResultUseCase:
 
         time_unknown = user.birth_info.birth_time_unknown
 
+        # FortuneTeller 응답의 gender 형식이 다를 수 있어 User 도메인 값("male"/"female")으로 강제.
+        # spouse_avoid/match가 `gender == "male"`로 비교하므로 SSOT를 User 엔티티로 통일한다.
         analysis_input = dict(result.fortuneteller_response)
-        analysis_input.setdefault("gender", user.gender.value)
+        analysis_input["gender"] = user.gender.value
 
         return build_free_result_response(
             session_token=user.session_token,
