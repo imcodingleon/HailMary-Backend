@@ -19,10 +19,12 @@ from typing import Any, cast
 from app.domains.ai.application.response.paid_report_response import (
     CandleRow,
     CharmSalView,
+    EndingCard,
     IlganCardP0,
     IllusionGoodCard,
     IllusionSignal,
     InfoRow,
+    InnerCard,
     OhangKey,
     OhangStrength,
     PaidChapterP0,
@@ -31,6 +33,8 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP3,
     PaidChapterP4,
     PaidChapterP5,
+    PaidChapterP6,
+    PaidChapterP7,
     PaidChaptersResponse,
     PointCard,
     RecoveryAccel,
@@ -62,10 +66,18 @@ from app.domains.ai.domain.templates.yeonwoo_p4_blocking2 import (
     compose_p4_blocking2,
 )
 from app.domains.ai.domain.templates.yeonwoo_p5_charm import compose_p5_charm
+from app.domains.ai.domain.templates.yeonwoo_p6_destined import (
+    VALID_SLOTID as VALID_MATCH_SLOTID,
+)
+from app.domains.ai.domain.templates.yeonwoo_p6_destined import (
+    compose_p6_destined,
+)
+from app.domains.ai.domain.templates.yeonwoo_p7_inner import compose_p7_inner
 from app.domains.ai.domain.value_object.ilgan_cards import get_ilgan_card
 from app.domains.user.domain.service.charm_service import CharmService
 from app.domains.user.domain.service.saju_data_extractor import SajuDataExtractor
 from app.domains.user.domain.service.spouse_avoid_service import SpouseAvoidService
+from app.domains.user.domain.service.spouse_match_service import SpouseMatchService
 
 # ── 한글 오행 → 응답 코드 매핑 ──────────────────────────────────
 _OHANG_HANGUL_TO_CODE: dict[str, OhangKey] = {
@@ -118,7 +130,7 @@ def _ohang_code(hangul: str) -> OhangKey:
 
 
 class ComposePaidReportUseCase:
-    """사주 raw → P-0~P-5 페이지 dict 통합 합성.
+    """사주 raw → P-0~P-6 페이지 dict 통합 합성.
 
     DB 연동 후 `GetPaidReportUseCase`가 `PaidReport.chapters` (이미 합성된 JSON)을
     그대로 반환할 예정. 그 합성 시점에 이 UseCase를 호출하면 됨.
@@ -131,13 +143,15 @@ class ComposePaidReportUseCase:
         saju_extractor: SajuDataExtractor | None = None,
         charm_service: CharmService | None = None,
         spouse_avoid_service: SpouseAvoidService | None = None,
+        spouse_match_service: SpouseMatchService | None = None,
     ) -> None:
         self._extractor = saju_extractor or SajuDataExtractor()
         self._charm = charm_service or CharmService()
         self._spouse_avoid = spouse_avoid_service or SpouseAvoidService()
+        self._spouse_match = spouse_match_service or SpouseMatchService()
 
     def execute(self, saju_raw: dict[str, Any]) -> PaidChaptersResponse:
-        """사주 raw → 12 페이지 응답 (현재 P-0~P-5만 채움)."""
+        """사주 raw → 12 페이지 응답 (현재 P-0~P-7만 채움)."""
         vars_ = self._extractor.extract_paid_variables(saju_raw)
         ilgan: str = vars_["ILGAN"]
         ilju: str = vars_["ILJU"]
@@ -151,6 +165,7 @@ class ComposePaidReportUseCase:
         charm = self._charm.calculate(saju_raw)
         sal_keys = tuple(self._charm.get_user_charm_sals(saju_raw))
         akyon_slot_id = self._resolve_akyon_slot_id(saju_raw)
+        match_slot_id = self._resolve_match_slot_id(saju_raw)
 
         return PaidChaptersResponse(
             p0=self._build_p0(vars_, ilgan, ohang_excess, ohang_lack),
@@ -159,6 +174,8 @@ class ComposePaidReportUseCase:
             p3=self._build_p3(ilgan, ohang_excess),
             p4=self._build_p4(ilgan, akyon_slot_id, ohang_excess),
             p5=self._build_p5(ilgan, charm, sal_keys),
+            p6=self._build_p6(ilgan, match_slot_id, ohang_lack),
+            p7=self._build_p7(ilgan),
         )
 
     # ── P-0 ──────────────────────────────────────────────────
@@ -348,11 +365,58 @@ class ComposePaidReportUseCase:
             ai_sense=d["ai_sense"],
         )
 
+    # ── P-6 ──────────────────────────────────────────────────
+    def _build_p6(
+        self, ilgan: str, match_slot_id: str, ohang_lack: str,
+    ) -> PaidChapterP6 | None:
+        if match_slot_id not in VALID_MATCH_SLOTID:
+            return None
+        d = compose_p6_destined(
+            ilgan=ilgan,
+            match_slot_id=match_slot_id,
+            ohang_lack=ohang_lack,
+        )
+        return PaidChapterP6(
+            match_slot_id=d["match_slot_id"],
+            keyword_tags=list(d["keyword_tags"]),
+            info_rows=[InfoRow(key=r["key"], val=r["val"]) for r in d["info_rows"]],
+            ai_looks=d["ai_looks"],
+            ai_match=d["ai_match"],
+            ai_first_meeting=d["ai_first_meeting"],
+            bubble=d["bubble"],
+            inner_cards=[
+                InnerCard(label=c["label"], value=c["value"], sub=c["sub"])
+                for c in d["inner_cards"]
+            ],
+            ai_inner=d["ai_inner"],
+        )
+
+    # ── P-7 ──────────────────────────────────────────────────
+    def _build_p7(self, ilgan: str) -> PaidChapterP7:
+        d = compose_p7_inner(ilgan=ilgan)
+        return PaidChapterP7(
+            ending_card_1=EndingCard(**d["ending_card_1"]),
+            ending_card_2=EndingCard(**d["ending_card_2"]),
+            ending_card_3=EndingCard(**d["ending_card_3"]),
+            ai_ending=d["ai_ending"],
+            notice=d["notice"],
+            bubble=d["bubble"],
+        )
+
     # ── 헬퍼: 악연 slotId 추출 ──────────────────────────────────
     def _resolve_akyon_slot_id(self, saju_raw: dict[str, Any]) -> str:
         """무료 응답의 SpouseAvoidView.slotId 재사용. 'neutral'이면 빈 문자열."""
         view = self._spouse_avoid.calculate(saju_raw)
         slot_id = str(view.get("slotId") or "")
-        if slot_id == "neutral":
+        if slot_id.endswith("-neutral"):
+            return ""
+        return slot_id
+
+    # ── 헬퍼: 인연 slotId 추출 ──────────────────────────────────
+    def _resolve_match_slot_id(self, saju_raw: dict[str, Any]) -> str:
+        """무료 응답의 SpouseMatchView.slotId 재사용. neutral은 빈 문자열."""
+        view = self._spouse_match.calculate(saju_raw)
+        slot_id = str(view.get("slotId") or "")
+        if slot_id.endswith("-neutral"):
             return ""
         return slot_id

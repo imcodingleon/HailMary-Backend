@@ -10,7 +10,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-
 # ═════════════════════════════════════════════════════════════════
 # Nested 공용 타입
 # ═════════════════════════════════════════════════════════════════
@@ -261,6 +260,64 @@ class PaidChapterP5(BaseModel):
 
 
 # ═════════════════════════════════════════════════════════════════
+# P-6 四 붉은 실이 이어진 사람 (1/2)
+# ═════════════════════════════════════════════════════════════════
+
+
+class InnerCard(BaseModel):
+    """P-6 4-2 속마음 투시 카드 (실 상태 + 행동→심리 2)."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    label: str
+    value: str
+    sub: str
+
+
+class PaidChapterP6(BaseModel):
+    """P-6 — 4-1 인연 외형/매칭/첫 만남 + 4-2 속마음 투시."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    # 4-1 붉은 실이 이어진 사람
+    match_slot_id: str  # "m-water-yang" 등 20 슬롯 (neutral은 caller가 None fallback)
+    keyword_tags: list[str]   # 일간별 5
+    info_rows: list[InfoRow]  # 일간별 8 (P-4 InfoRow 재사용)
+    ai_looks: str             # 외형 묘사 (도입 + 슬롯 외형)
+    ai_match: str             # 오행 매칭 + 일간 안정 짝
+    ai_first_meeting: str     # 첫 만남 시나리오 (3 단락)
+    bubble: str               # 강연우 멘트 (고정)
+    # 4-2 속마음 투시
+    inner_cards: list[InnerCard]  # 3 (실 상태 + 행동→심리 2개)
+    ai_inner: str                 # 일간별 3 단락
+
+
+# ═════════════════════════════════════════════════════════════════
+# P-7 四 결말 예측 시나리오 (2/2)
+# ═════════════════════════════════════════════════════════════════
+
+
+class EndingCard(BaseModel):
+    """P-7 4-3 결말 카드 (warn/good/amber 3종)."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    label: str   # "지금 이대로" / "네가 먼저" / "상대가 먼저"
+    value: str   # 한 줄 헤드 (일간별)
+    sub: str     # 해설 (일간별)
+    tone: Literal["warn", "good", "amber"]
+
+
+class PaidChapterP7(BaseModel):
+    """P-7 — 4-3 결말 예측 시나리오 (세 갈래 + AI 권유)."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    ending_card_1: EndingCard  # warn
+    ending_card_2: EndingCard  # good
+    ending_card_3: EndingCard  # amber
+    ai_ending: str             # 일간별 4 단락
+    notice: str                # 🔮 안내문 (고정)
+    bubble: str                # 강연우 멘트 (고정)
+
+
+# ═════════════════════════════════════════════════════════════════
 # Chapters wrapper + Top-level response
 # ═════════════════════════════════════════════════════════════════
 
@@ -279,7 +336,9 @@ class PaidChaptersResponse(BaseModel):
     p3: PaidChapterP3 | None = None
     p4: PaidChapterP4 | None = None
     p5: PaidChapterP5 | None = None
-    # P-6~P-11 후속
+    p6: PaidChapterP6 | None = None
+    p7: PaidChapterP7 | None = None
+    # P-8~P-11 후속
 
 
 class PaidReportStatusResponse(BaseModel):

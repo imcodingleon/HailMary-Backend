@@ -31,7 +31,7 @@ def _imsu_saju() -> dict[str, Any]:
     }
 
 
-def test_compose_returns_p0_to_p5() -> None:
+def test_compose_returns_p0_to_p7() -> None:
     usecase = ComposePaidReportUseCase()
     res = usecase.execute(_imsu_saju())
 
@@ -87,14 +87,38 @@ def test_compose_returns_p0_to_p5() -> None:
     assert len(res.p5.stage_cards) == 4
     assert len(res.p5.point_cards) == 3
 
+    # P-6 (spouse_match slotId: yongSin 없으면 stemElement를 생하는 오행 = 수→금,
+    # day_yin_yang 양 → match_yin_yang 음, gender female → opposite m → "m-metal-yin")
+    assert res.p6 is not None
+    assert res.p6.match_slot_id == "m-metal-yin"
+    assert len(res.p6.keyword_tags) == 5
+    assert len(res.p6.info_rows) == 8
+    assert res.p6.ai_looks and res.p6.ai_match and res.p6.ai_first_meeting
+    assert res.p6.bubble
+    # 4-2 속마음 투시
+    assert len(res.p6.inner_cards) == 3
+    assert all(c.label and c.value and c.sub for c in res.p6.inner_cards)
+    assert res.p6.ai_inner
 
-def test_compose_neutral_slot_returns_p4_none() -> None:
-    """yongSin/stemElement 모두 없으면 slotId='neutral' → P-4 None."""
+    # P-7 (4-3 결말 예측 — 일간 변형만)
+    assert res.p7 is not None
+    assert res.p7.ending_card_1.tone == "warn"
+    assert res.p7.ending_card_2.tone == "good"
+    assert res.p7.ending_card_3.tone == "amber"
+    assert res.p7.ai_ending and res.p7.notice and res.p7.bubble
+
+
+def test_compose_neutral_slot_returns_p4_p6_none() -> None:
+    """yongSin/stemElement 모두 없으면 slotId='neutral' → P-4, P-6 둘 다 None.
+    P-7은 일간만 받기 때문에 슬롯 미정과 무관하게 채워짐."""
     saju = _imsu_saju()
-    saju["day"].pop("stemElement", None)  # spouse_avoid가 neutral 반환
+    saju["day"].pop("stemElement", None)  # spouse_avoid/match가 neutral 반환
     res = ComposePaidReportUseCase().execute(saju)
     assert res.p0 is not None
-    assert res.p4 is None  # P-4만 빠지고 나머지는 채워짐
+    assert res.p4 is None  # P-4 빠짐 (악연 슬롯 neutral)
+    assert res.p6 is None  # P-6 빠짐 (인연 슬롯 neutral)
+    assert res.p5 is not None  # 다른 페이지는 채워짐
+    assert res.p7 is not None  # P-7은 일간만 쓰니까 채워짐
 
 
 def test_compose_returns_empty_when_ilgan_missing() -> None:
