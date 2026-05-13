@@ -31,7 +31,7 @@ def _imsu_saju() -> dict[str, Any]:
     }
 
 
-def test_compose_returns_p0_to_p8() -> None:
+def test_compose_returns_p0_to_p9() -> None:
     usecase = ComposePaidReportUseCase()
     res = usecase.execute(_imsu_saju())
 
@@ -117,6 +117,26 @@ def test_compose_returns_p0_to_p8() -> None:
     assert res.p8.ai_intro.count("\n\n") == 2
     assert res.p8.bubble
 
+    # P-9 (6-1 오행 보완 — 부족 오행 + 일간 변형)
+    assert res.p9 is not None
+    assert "(" in res.p9.ohang_lack and ")" in res.p9.ohang_lack  # 한자 포함
+    assert len(res.p9.ohang_method_cards) == 3
+    assert res.p9.ai_ohang.count("\n\n") == 2  # 3단락
+
+    # P-9 (6-2 매력살 활용 — Primary 매력살 + 일간 변형)
+    # _imsu_saju() fixture는 매력살이 없을 수도 있음 → am_rok 폴백 또는 보유 매력살로 합성
+    assert res.p9.primary_charm_key in {
+        "do_hwa_sal", "hong_yeom_sal", "hwa_gae_sal",
+        "geum_yeo_rok", "gong_mang", "cheon_eul_gwi_in", "am_rok",
+    }
+    assert "(" in res.p9.primary_charm_label  # 한자 포함
+    assert 0 <= res.p9.charm_count <= 6
+    assert res.p9.charm_current in {"微", "弱", "中", "強", "極"}
+    assert res.p9.charm_target in {"微", "弱", "中", "強", "極"}
+    assert len(res.p9.charm_practice_cards) == 3
+    assert res.p9.charm_practice_body  # 본문 채워짐
+    assert res.p9.ai_charm.count("\n\n") == 2  # 3단락
+
 
 def test_compose_neutral_slot_returns_p4_p6_none() -> None:
     """yongSin/stemElement 모두 없으면 slotId='neutral' → P-4, P-6 둘 다 None.
@@ -130,6 +150,7 @@ def test_compose_neutral_slot_returns_p4_p6_none() -> None:
     assert res.p5 is not None  # 다른 페이지는 채워짐
     assert res.p7 is not None  # P-7은 일간만 쓰니까 채워짐
     assert res.p8 is not None  # P-8도 일간+사주 raw로 채워짐
+    assert res.p9 is not None  # P-9는 일간+부족 오행만 쓰니까 채워짐
 
 
 def test_compose_returns_empty_when_ilgan_missing() -> None:

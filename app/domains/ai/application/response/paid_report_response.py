@@ -344,6 +344,51 @@ class PaidChapterP8(BaseModel):
 
 
 # ═════════════════════════════════════════════════════════════════
+# P-9 六 실천 가이드 (6-1 오행 보완만 backend 합성, 6-2는 frontend MOCK)
+# ═════════════════════════════════════════════════════════════════
+
+
+class OhangMethodCard(BaseModel):
+    """P-9 6-1 보완 방법 카드 (색·공간·행동)."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    label: str
+    value: str
+    sub: str
+
+
+class CharmPracticeCard(BaseModel):
+    """P-9 6-2 매력살 실천 카드 (감각·태도·언어)."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    label: str
+    value: str
+    sub: str
+
+
+CharmStageLiteral = Literal["微", "弱", "中", "強", "極"]
+
+
+class PaidChapterP9(BaseModel):
+    """P-9 — 6-1 오행 보완 + 6-2 매력살 활용."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    # 6-1
+    ohang_lack: str   # "토(土)" 한자 포함
+    ohang_method_cards: list[OhangMethodCard]  # 3 (색/공간/행동)
+    ai_ohang: str     # 3 단락 (오행 헤더 + 방법 본문 + 일간 결)
+    # 6-2
+    primary_charm_key: str            # "do_hwa_sal" / "am_rok" 등
+    primary_charm_label: str          # "도화살(桃花煞)"
+    charm_count: int                  # 보유 매력살 수 (0~6)
+    charm_current: CharmStageLiteral  # 5단계 한자
+    charm_target: CharmStageLiteral
+    charm_practice_cards: list[CharmPracticeCard]  # 3 (감각/태도/언어)
+    charm_practice_body: str          # 카드 3 요약 + 단계 변화 한 줄
+    ai_charm: str                     # 3 단락 (보유 인식 + 헤더 / 본문 / 일간 결)
+
+
+# ═════════════════════════════════════════════════════════════════
 # Chapters wrapper + Top-level response
 # ═════════════════════════════════════════════════════════════════
 
@@ -365,7 +410,8 @@ class PaidChaptersResponse(BaseModel):
     p6: PaidChapterP6 | None = None
     p7: PaidChapterP7 | None = None
     p8: PaidChapterP8 | None = None
-    # P-9~P-11 후속
+    p9: PaidChapterP9 | None = None
+    # P-10~P-11 후속
 
 
 class PaidReportStatusResponse(BaseModel):

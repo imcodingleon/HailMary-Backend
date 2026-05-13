@@ -19,6 +19,7 @@ from typing import Any, cast
 
 from app.domains.ai.application.response.paid_report_response import (
     CandleRow,
+    CharmPracticeCard,
     CharmSalView,
     EndingCard,
     IlganCardP0,
@@ -28,6 +29,7 @@ from app.domains.ai.application.response.paid_report_response import (
     InnerCard,
     MonthRow,
     OhangKey,
+    OhangMethodCard,
     OhangStrength,
     PaidChapterP0,
     PaidChapterP1,
@@ -38,6 +40,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP6,
     PaidChapterP7,
     PaidChapterP8,
+    PaidChapterP9,
     PaidChaptersResponse,
     PointCard,
     RecoveryAccel,
@@ -77,6 +80,8 @@ from app.domains.ai.domain.templates.yeonwoo_p6_destined import (
 )
 from app.domains.ai.domain.templates.yeonwoo_p7_inner import compose_p7_inner
 from app.domains.ai.domain.templates.yeonwoo_p8_timing import compose_p8_timing
+from app.domains.ai.domain.templates.yeonwoo_p9_charm import compose_p9_charm
+from app.domains.ai.domain.templates.yeonwoo_p9_practice import compose_p9_practice
 from app.domains.ai.domain.value_object.ilgan_cards import get_ilgan_card
 from app.domains.user.domain.service.charm_service import CharmService
 from app.domains.user.domain.service.monthly_romance_flow_service import (
@@ -202,6 +207,7 @@ class ComposePaidReportUseCase:
             p6=self._build_p6(ilgan, match_slot_id, ohang_lack),
             p7=self._build_p7(ilgan),
             p8=self._build_p8(saju_raw, ilgan, start_year, start_month),
+            p9=self._build_p9(ilgan, ohang_lack, sal_keys, charm),
         )
 
     # ── P-0 ──────────────────────────────────────────────────
@@ -460,6 +466,41 @@ class ComposePaidReportUseCase:
             ],
             ai_intro=cast(str, d["ai_intro"]),
             bubble=cast(str, d["bubble"]),
+        )
+
+    # ── P-9 ──────────────────────────────────────────────────
+    def _build_p9(
+        self,
+        ilgan: str,
+        ohang_lack: str,
+        sal_keys: tuple[str, ...],
+        charm: dict[str, Any],
+    ) -> PaidChapterP9:
+        # 6-1 오행 보완
+        d = compose_p9_practice(ilgan=ilgan, ohang_lack=ohang_lack)
+        # 6-2 매력살 활용 — sal_keys 정렬은 charm_service에서 SAL_PRIORITY 순. Primary = sal_keys[0].
+        charm_score = int(charm.get("charmStrength", 0))
+        c = compose_p9_charm(ilgan=ilgan, sal_keys=sal_keys, charm_score=charm_score)
+        return PaidChapterP9(
+            # 6-1
+            ohang_lack=cast(str, d["ohang_lack"]),
+            ohang_method_cards=[
+                OhangMethodCard(label=card["label"], value=card["value"], sub=card["sub"])
+                for card in cast(list[dict[str, str]], d["ohang_method_cards"])
+            ],
+            ai_ohang=cast(str, d["ai_ohang"]),
+            # 6-2
+            primary_charm_key=cast(str, c["primary_charm_key"]),
+            primary_charm_label=cast(str, c["primary_charm_label"]),
+            charm_count=cast(int, c["charm_count"]),
+            charm_current=cast(Any, c["charm_current"]),
+            charm_target=cast(Any, c["charm_target"]),
+            charm_practice_cards=[
+                CharmPracticeCard(label=card["label"], value=card["value"], sub=card["sub"])
+                for card in cast(list[dict[str, str]], c["charm_practice_cards"])
+            ],
+            charm_practice_body=cast(str, c["charm_practice_body"]),
+            ai_charm=cast(str, c["ai_charm"]),
         )
 
     # ── 헬퍼: 악연 slotId 추출 ──────────────────────────────────
