@@ -194,15 +194,34 @@ class MonthlyRomanceFlowService:
 
     내부적으로 12개월을 산출한 뒤 무료 응답 형태(visibleMonths 2개 + lockedSlots
     메타)로 잘라 반환한다.
+
+    유료 P-8 (12개월 운명선)에서는 `compute_full_months()`로 12 raw months를 받아
+    직접 합성한다.
     """
 
     def __init__(self, clock: _Clock | None = None) -> None:
         self._clock = clock or _SystemClock()
 
-    def calculate(self, saju: dict[str, Any]) -> dict[str, Any]:
-        now = self._clock.now()
-        start_year = now.year
-        start_month = now.month
+    def compute_full_months(
+        self,
+        saju: dict[str, Any],
+        start_year: int | None = None,
+        start_month: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """12 raw months 반환. P-8 합성용.
+
+        Args:
+            saju: 사주 raw dict
+            start_year, start_month: 시작 시점. 둘 다 None이면 now 사용.
+
+        Returns:
+            [{year, month, stem, branch, romanceScore, isPeak}, ...] × 12.
+            isPeak는 12개월 중 score 최대 1개에만 True.
+        """
+        if start_year is None or start_month is None:
+            now = self._clock.now()
+            start_year = now.year
+            start_month = now.month
 
         months: list[dict[str, Any]] = []
         for i in range(12):
@@ -211,12 +230,10 @@ class MonthlyRomanceFlowService:
             if m > 12:
                 m -= 12
                 y += 1
-
             year_stem = _get_year_stem(y)
             month_branch = MONTH_TO_BRANCH[m]
             month_stem = _get_month_stem(year_stem, month_branch)
             romance_score = _calc_month_score(saju, month_stem, month_branch)
-
             months.append({
                 "year": y, "month": m, "stem": month_stem,
                 "branch": month_branch, "romanceScore": romance_score,
@@ -228,6 +245,15 @@ class MonthlyRomanceFlowService:
             if months[i]["romanceScore"] > months[peak_index]["romanceScore"]:
                 peak_index = i
         months[peak_index]["isPeak"] = True
+        return months
+
+    def calculate(self, saju: dict[str, Any]) -> dict[str, Any]:
+        months = self.compute_full_months(saju)
+
+        # peak_index 재추출 (compute_full_months에서 isPeak True인 row 위치)
+        peak_index = next(
+            (i for i, m in enumerate(months) if m["isPeak"]), 0
+        )
 
         first = months[0]
         second = months[1]

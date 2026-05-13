@@ -31,7 +31,7 @@ def _imsu_saju() -> dict[str, Any]:
     }
 
 
-def test_compose_returns_p0_to_p7() -> None:
+def test_compose_returns_p0_to_p8() -> None:
     usecase = ComposePaidReportUseCase()
     res = usecase.execute(_imsu_saju())
 
@@ -107,6 +107,16 @@ def test_compose_returns_p0_to_p7() -> None:
     assert res.p7.ending_card_3.tone == "amber"
     assert res.p7.ai_ending and res.p7.notice and res.p7.bubble
 
+    # P-8 (5-1 12개월 운명선 — MonthlyRomanceFlowService + 일간 변형)
+    assert res.p8 is not None
+    assert len(res.p8.months) == 12
+    assert sum(1 for m in res.p8.months if m.is_peak) == 2  # 피크 2개
+    # 첫 row label에 "(이번달)" 포함
+    assert "(이번달)" in res.p8.months[0].label
+    # AI 박스 3단락
+    assert res.p8.ai_intro.count("\n\n") == 2
+    assert res.p8.bubble
+
 
 def test_compose_neutral_slot_returns_p4_p6_none() -> None:
     """yongSin/stemElement 모두 없으면 slotId='neutral' → P-4, P-6 둘 다 None.
@@ -119,6 +129,7 @@ def test_compose_neutral_slot_returns_p4_p6_none() -> None:
     assert res.p6 is None  # P-6 빠짐 (인연 슬롯 neutral)
     assert res.p5 is not None  # 다른 페이지는 채워짐
     assert res.p7 is not None  # P-7은 일간만 쓰니까 채워짐
+    assert res.p8 is not None  # P-8도 일간+사주 raw로 채워짐
 
 
 def test_compose_returns_empty_when_ilgan_missing() -> None:

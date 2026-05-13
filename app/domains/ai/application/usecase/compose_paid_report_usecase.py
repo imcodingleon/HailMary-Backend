@@ -14,6 +14,7 @@ P-6~P-11은 templates 미작성 → `None` 반환 (프론트 MOCK fallback).
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, cast
 
 from app.domains.ai.application.response.paid_report_response import (
@@ -25,6 +26,7 @@ from app.domains.ai.application.response.paid_report_response import (
     IllusionSignal,
     InfoRow,
     InnerCard,
+    MonthRow,
     OhangKey,
     OhangStrength,
     PaidChapterP0,
@@ -35,6 +37,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP5,
     PaidChapterP6,
     PaidChapterP7,
+    PaidChapterP8,
     PaidChaptersResponse,
     PointCard,
     RecoveryAccel,
@@ -73,8 +76,12 @@ from app.domains.ai.domain.templates.yeonwoo_p6_destined import (
     compose_p6_destined,
 )
 from app.domains.ai.domain.templates.yeonwoo_p7_inner import compose_p7_inner
+from app.domains.ai.domain.templates.yeonwoo_p8_timing import compose_p8_timing
 from app.domains.ai.domain.value_object.ilgan_cards import get_ilgan_card
 from app.domains.user.domain.service.charm_service import CharmService
+from app.domains.user.domain.service.monthly_romance_flow_service import (
+    MonthlyRomanceFlowService,
+)
 from app.domains.user.domain.service.saju_data_extractor import SajuDataExtractor
 from app.domains.user.domain.service.spouse_avoid_service import SpouseAvoidService
 from app.domains.user.domain.service.spouse_match_service import SpouseMatchService
@@ -144,14 +151,32 @@ class ComposePaidReportUseCase:
         charm_service: CharmService | None = None,
         spouse_avoid_service: SpouseAvoidService | None = None,
         spouse_match_service: SpouseMatchService | None = None,
+        monthly_flow_service: MonthlyRomanceFlowService | None = None,
     ) -> None:
         self._extractor = saju_extractor or SajuDataExtractor()
         self._charm = charm_service or CharmService()
         self._spouse_avoid = spouse_avoid_service or SpouseAvoidService()
         self._spouse_match = spouse_match_service or SpouseMatchService()
+        self._monthly_flow = monthly_flow_service or MonthlyRomanceFlowService()
 
-    def execute(self, saju_raw: dict[str, Any]) -> PaidChaptersResponse:
-        """사주 raw → 12 페이지 응답 (현재 P-0~P-7만 채움)."""
+    def execute(
+        self,
+        saju_raw: dict[str, Any],
+        *,
+        start_year: int | None = None,
+        start_month: int | None = None,
+    ) -> PaidChaptersResponse:
+        """사주 raw → 12 페이지 응답 (현재 P-0~P-8만 채움).
+
+        Args:
+            saju_raw: FortuneTeller raw 응답 dict.
+            start_year, start_month: P-8 12개월 운명선의 시작 시점. 둘 다 None이면
+                현재 시점 (datetime.now). 결제 시점에 캐싱하려는 caller가 명시 가능.
+        """
+        if start_year is None or start_month is None:
+            now = datetime.now()
+            start_year = now.year
+            start_month = now.month
         vars_ = self._extractor.extract_paid_variables(saju_raw)
         ilgan: str = vars_["ILGAN"]
         ilju: str = vars_["ILJU"]
@@ -176,6 +201,7 @@ class ComposePaidReportUseCase:
             p5=self._build_p5(ilgan, charm, sal_keys),
             p6=self._build_p6(ilgan, match_slot_id, ohang_lack),
             p7=self._build_p7(ilgan),
+            p8=self._build_p8(saju_raw, ilgan, start_year, start_month),
         )
 
     # ── P-0 ──────────────────────────────────────────────────
@@ -401,6 +427,39 @@ class ComposePaidReportUseCase:
             ai_ending=d["ai_ending"],
             notice=d["notice"],
             bubble=d["bubble"],
+        )
+
+    # ── P-8 ──────────────────────────────────────────────────
+    def _build_p8(
+        self,
+        saju_raw: dict[str, Any],
+        ilgan: str,
+        start_year: int,
+        start_month: int,
+    ) -> PaidChapterP8:
+        raw_months = self._monthly_flow.compute_full_months(
+            saju_raw, start_year=start_year, start_month=start_month
+        )
+        d = compose_p8_timing(
+            ilgan=ilgan,
+            raw_months=raw_months,
+            start_year=start_year,
+            start_month=start_month,
+        )
+        return PaidChapterP8(
+            months=[
+                MonthRow(
+                    label=cast(str, m["label"]),
+                    hearts=cast(int, m["hearts"]),
+                    knot=cast(Any, m["knot"]),
+                    state=cast(str, m["state"]),
+                    desc=cast(str, m["desc"]),
+                    is_peak=cast(bool, m["is_peak"]),
+                )
+                for m in cast(list[dict[str, object]], d["months"])
+            ],
+            ai_intro=cast(str, d["ai_intro"]),
+            bubble=cast(str, d["bubble"]),
         )
 
     # ── 헬퍼: 악연 slotId 추출 ──────────────────────────────────

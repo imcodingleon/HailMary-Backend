@@ -318,6 +318,32 @@ class PaidChapterP7(BaseModel):
 
 
 # ═════════════════════════════════════════════════════════════════
+# P-8 五 12개월 운명선
+# ═════════════════════════════════════════════════════════════════
+
+
+class MonthRow(BaseModel):
+    """P-8 5-1 타임라인 월별 row."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    label: str   # "5월 (이번달)" / "6월" / "'27. 1월"
+    hearts: int  # 1~5
+    knot: Literal["loose", "tight", "glowing"]
+    state: str   # 시작/진입/상승/피크/심화/안정/정체/재상승/2차 피크/신뢰/충전/1년차 마무리
+    desc: str
+    is_peak: bool = False
+
+
+class PaidChapterP8(BaseModel):
+    """P-8 — 5-1 12개월 운명선."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    months: list[MonthRow]   # 12
+    ai_intro: str            # 3 단락 (도입 + 피크 월 2개 + 일간 흐름)
+    bubble: str              # 강연우 멘트 (고정)
+
+
+# ═════════════════════════════════════════════════════════════════
 # Chapters wrapper + Top-level response
 # ═════════════════════════════════════════════════════════════════
 
@@ -338,7 +364,8 @@ class PaidChaptersResponse(BaseModel):
     p5: PaidChapterP5 | None = None
     p6: PaidChapterP6 | None = None
     p7: PaidChapterP7 | None = None
-    # P-8~P-11 후속
+    p8: PaidChapterP8 | None = None
+    # P-9~P-11 후속
 
 
 class PaidReportStatusResponse(BaseModel):
