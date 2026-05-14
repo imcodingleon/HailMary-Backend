@@ -19,14 +19,23 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 운영 DB에 기존 paid_reports row가 있을 경우를 위해 3단계로:
-    # 1. nullable 컬럼으로 추가
-    # 2. 기존 row에 MySQL UUID() (32자 hex)로 채움
-    # 3. NOT NULL 강제 후 UNIQUE INDEX
-    op.add_column('paid_reports', sa.Column('share_code', sa.String(length=32), nullable=True))
-    op.execute("UPDATE paid_reports SET share_code = REPLACE(UUID(), '-', '') WHERE share_code IS NULL")
+    # Idempotent — 첫 fail에서 ADD COLUMN은 통과했지만 CREATE INDEX에서 실패한 운영 DB
+    # 상태도 안전하게 처리. 1) 컬럼 있나 검사 후 추가 2) 빈값 row UUID 백필
+    # 3) NOT NULL alter 4) INDEX 있나 검사 후 생성.
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    columns = [c['name'] for c in insp.get_columns('paid_reports')]
+    indexes = [i['name'] for i in insp.get_indexes('paid_reports')]
+
+    if 'share_code' not in columns:
+        op.add_column('paid_reports', sa.Column('share_code', sa.String(length=32), nullable=True))
+
+    op.execute("UPDATE paid_reports SET share_code = REPLACE(UUID(), '-', '') WHERE share_code IS NULL OR share_code = ''")
+
     op.alter_column('paid_reports', 'share_code', existing_type=sa.String(length=32), nullable=False)
-    op.create_index(op.f('ix_paid_reports_share_code'), 'paid_reports', ['share_code'], unique=True)
+
+    if 'ix_paid_reports_share_code' not in indexes:
+        op.create_index(op.f('ix_paid_reports_share_code'), 'paid_reports', ['share_code'], unique=True)
 
 
 def downgrade() -> None:
