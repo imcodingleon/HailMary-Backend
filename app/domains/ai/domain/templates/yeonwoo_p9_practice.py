@@ -172,7 +172,7 @@ ILGAN_PRACTICE_BY_ILGAN: dict[str, str] = {
         "거기에 {ohang_with_hanja} 기운이 들어가야 비로소 인연이 움직여."
     ),
     "기토": (
-        "{ilgan_with_hanja} 일간은 다정하게 키워주는 결인데, "
+        "{ilgan_with_hanja} 일간은 다정하게 받쳐주는 결인데, "
         "거기에 {ohang_with_hanja} 기운이 들어가야 비로소 인연이 움직여."
     ),
     "경금": (

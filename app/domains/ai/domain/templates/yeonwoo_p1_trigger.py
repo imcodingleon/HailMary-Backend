@@ -139,7 +139,7 @@ PARA_4_INTRO_BY_ILGAN: dict[str, str] = {
     "병화": "{ilgan_with_hanja} 일간은 한번 흔들리면 다 쏟아내.",
     "정화": "{ilgan_with_hanja} 일간은 한번 켜지면 안 꺼져.",
     "무토": "{ilgan_with_hanja} 일간은 한번 자리 잡으면 흔들리지 않아.",
-    "기토": "{ilgan_with_hanja} 일간은 한번 품으면 끝까지 키워.",
+    "기토": "{ilgan_with_hanja} 일간은 한번 품으면 끝까지 받쳐.",
     "경금": "{ilgan_with_hanja} 일간은 한번 정하면 단단해져.",
     "신금": "{ilgan_with_hanja} 일간은 쉽게 안 빠지는데 한번 들이면 깊게 새겨.",
     "임수": "{ilgan_with_hanja} 일간은 한번 빠지면 못 빠져나와.",
