@@ -29,9 +29,21 @@ class PaidReportCreatorPort(Protocol):
 
     AI 도메인 의존성 역전: payment 도메인은 ai 도메인을 import하지 않는다.
     main.py에서 CreatePaidReportUseCase를 어댑터로 주입한다.
+
+    user_id: AI 도메인이 saju/survey 조회 + chapters 합성에 사용. None이면 합성 스킵.
+    customer_email, expires_at, character: 합성 완료 후 이메일 발송용.
     """
 
-    async def execute(self, *, order_id: str, saju_hash: str) -> object: ...
+    async def execute(
+        self,
+        *,
+        order_id: str,
+        saju_hash: str,
+        user_id: int | None = None,
+        customer_email: str | None = None,
+        expires_at: datetime | None = None,
+        character: str | None = None,
+    ) -> object: ...
 
 
 class SajuHashResolverPort(Protocol):
@@ -147,6 +159,10 @@ class ConfirmPaymentUseCase:
             await self._paid_report_creator.execute(
                 order_id=saved.order_id,
                 saju_hash=saju_hash or saved.order_id,
+                user_id=saved.user_id,
+                customer_email=saved.customer_email,
+                expires_at=saved.expires_at,
+                character=saved.character.value,
             )
 
         # 6. Amplitude 분석 이벤트 발화 (fire-and-forget).

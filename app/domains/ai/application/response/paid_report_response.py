@@ -388,6 +388,21 @@ class PaidChapterP9(BaseModel):
     ai_charm: str                     # 3 단락 (보유 인식 + 헤더 / 본문 / 일간 결)
 
 
+class PaidChapterP10(BaseModel):
+    """P-10 (CH-7) 편지 — 박스 1·2·3 통합."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    ilju_with_hanja: str              # "병인(丙寅)"
+    box1_body: str                    # 박스 1 (도입 멘트 + step1 부분집합 본문)
+    box2_body: str                    # 박스 2 (4단락 합성)
+    quote_text: str                   # step3 raw 또는 "..."
+    quote_label: str                  # "— 네가 적은 너의 고민" / "— 적지 못한 너의 고민"
+    box3_body: str                    # AI 답장 또는 폴백
+    emphasis: str                     # 박스 3 강조구 (일간 10셀)
+    tail: str                         # 박스 3 꼬리 (고정)
+    uses_ai: bool                     # AI 호출 여부 (감사 로그용)
+
+
 # ═════════════════════════════════════════════════════════════════
 # Chapters wrapper + Top-level response
 # ═════════════════════════════════════════════════════════════════
@@ -411,7 +426,8 @@ class PaidChaptersResponse(BaseModel):
     p7: PaidChapterP7 | None = None
     p8: PaidChapterP8 | None = None
     p9: PaidChapterP9 | None = None
-    # P-10~P-11 후속
+    p10: PaidChapterP10 | None = None
+    # P-11 후속
 
 
 class PaidReportStatusResponse(BaseModel):

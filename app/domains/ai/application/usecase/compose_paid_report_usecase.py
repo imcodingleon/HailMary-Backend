@@ -41,6 +41,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP7,
     PaidChapterP8,
     PaidChapterP9,
+    PaidChapterP10,
     PaidChaptersResponse,
     PointCard,
     RecoveryAccel,
@@ -82,6 +83,11 @@ from app.domains.ai.domain.templates.yeonwoo_p7_inner import compose_p7_inner
 from app.domains.ai.domain.templates.yeonwoo_p8_timing import compose_p8_timing
 from app.domains.ai.domain.templates.yeonwoo_p9_charm import compose_p9_charm
 from app.domains.ai.domain.templates.yeonwoo_p9_practice import compose_p9_practice
+from app.domains.ai.domain.templates.yeonwoo_p10_letter import (
+    compose_box1_body,
+    compose_box2_body,
+    compose_box3,
+)
 from app.domains.ai.domain.value_object.ilgan_cards import get_ilgan_card
 from app.domains.user.domain.service.charm_service import CharmService
 from app.domains.user.domain.service.monthly_romance_flow_service import (
@@ -170,13 +176,20 @@ class ComposePaidReportUseCase:
         *,
         start_year: int | None = None,
         start_month: int | None = None,
+        step1: tuple[str, ...] = (),
+        step2: tuple[str, ...] = (),
+        step3: str | None = None,
+        ai_letter_body: str | None = None,
     ) -> PaidChaptersResponse:
-        """사주 raw → 12 페이지 응답 (현재 P-0~P-8만 채움).
+        """사주 raw → 12 페이지 응답 (P-0~P-10).
 
         Args:
             saju_raw: FortuneTeller raw 응답 dict.
-            start_year, start_month: P-8 12개월 운명선의 시작 시점. 둘 다 None이면
-                현재 시점 (datetime.now). 결제 시점에 캐싱하려는 caller가 명시 가능.
+            start_year, start_month: P-8 12개월 운명선의 시작 시점. None이면 현재.
+            step1, step2: 설문 객관식 슬러그 튜플 (P-10 박스 1·2 합성).
+            step3: 설문 자유 텍스트 (P-10 박스 3 quote + AI 답장 트리거).
+            ai_letter_body: P-10 AI 호출 결과. None이면 폴백 (compose_box3 내부).
+                AI 호출은 별도 비동기 경로에서 수행되고 그 결과를 여기 주입.
         """
         if start_year is None or start_month is None:
             now = datetime.now()
@@ -197,6 +210,10 @@ class ComposePaidReportUseCase:
         akyon_slot_id = self._resolve_akyon_slot_id(saju_raw)
         match_slot_id = self._resolve_match_slot_id(saju_raw)
 
+        # P-6, P-8 먼저 빌드 — P-10 박스 2가 P-6 keyword_tags / P-8 peak labels 참조
+        p6 = self._build_p6(ilgan, match_slot_id, ohang_lack)
+        p8 = self._build_p8(saju_raw, ilgan, start_year, start_month)
+
         return PaidChaptersResponse(
             p0=self._build_p0(vars_, ilgan, ohang_excess, ohang_lack),
             p1=self._build_p1(ilgan, ilju),
@@ -204,10 +221,20 @@ class ComposePaidReportUseCase:
             p3=self._build_p3(ilgan, ohang_excess),
             p4=self._build_p4(ilgan, akyon_slot_id, ohang_excess),
             p5=self._build_p5(ilgan, charm, sal_keys),
-            p6=self._build_p6(ilgan, match_slot_id, ohang_lack),
+            p6=p6,
             p7=self._build_p7(ilgan),
-            p8=self._build_p8(saju_raw, ilgan, start_year, start_month),
+            p8=p8,
             p9=self._build_p9(ilgan, ohang_lack, sal_keys, charm),
+            p10=self._build_p10(
+                ilgan=ilgan,
+                ilju=ilju,
+                step1=step1,
+                step2=step2,
+                step3=step3,
+                p6=p6,
+                p8=p8,
+                ai_letter_body=ai_letter_body,
+            ),
         )
 
     # ── P-0 ──────────────────────────────────────────────────
@@ -501,6 +528,71 @@ class ComposePaidReportUseCase:
             ],
             charm_practice_body=cast(str, c["charm_practice_body"]),
             ai_charm=cast(str, c["ai_charm"]),
+        )
+
+    # ── P-10 ──────────────────────────────────────────────────
+    def _build_p10(
+        self,
+        *,
+        ilgan: str,
+        ilju: str,
+        step1: tuple[str, ...],
+        step2: tuple[str, ...],
+        step3: str | None,
+        p6: PaidChapterP6 | None,
+        p8: PaidChapterP8 | None,
+        ai_letter_body: str | None,
+    ) -> PaidChapterP10 | None:
+        """P-10 편지 합성 — 박스 1·2·3 통합.
+
+        step1 비어있으면 박스 1 합성 불가 → None 반환 (프론트 폴백 의지).
+        AI 호출(step3 있을 때)은 외부에서 수행되고 ai_letter_body로 주입.
+        ai_letter_body=None + step3 있음 = compose_box3 폴백 사용.
+        """
+        # 박스 1: step1 필요. 빈 튜플이면 합성 못함 → None
+        if not step1:
+            return None
+
+        # 박스 1 본문 (도입 멘트 + step1 부분집합 본문)
+        box1_body = compose_box1_body(ilgan=ilgan, step1=step1)
+
+        # 박스 2 본문 (step2 부분집합 × 일간 + P-6/P-8 placeholder)
+        # step2 없으면 박스 2 없는 셈 — 폴백으로 step2=(soulmate,)
+        effective_step2 = step2 if step2 else ("soulmate",)
+        keyword_tags: tuple[str, ...] | None = None
+        peak_labels: tuple[str, str] | None = None
+        if p6 is not None and p6.keyword_tags:
+            keyword_tags = tuple(p6.keyword_tags)
+        if p8 is not None and p8.months:
+            peaks = [m.label for m in p8.months if m.is_peak]
+            if len(peaks) >= 2:
+                peak_labels = (peaks[0], peaks[1])
+        box2_body = compose_box2_body(
+            ilgan=ilgan,
+            step2=effective_step2,
+            keyword_tags=keyword_tags,
+            peak_month_labels=peak_labels,
+        )
+
+        # 박스 3: step3 + AI 결과 또는 폴백
+        ilju_with_hanja = _ilju_with_hanja(ilju)
+        box3 = compose_box3(
+            ilgan=ilgan,
+            step3=step3,
+            step1=step1,
+            ai_letter_body=ai_letter_body,
+        )
+
+        return PaidChapterP10(
+            ilju_with_hanja=ilju_with_hanja,
+            box1_body=box1_body,
+            box2_body=box2_body,
+            quote_text=cast(str, box3["quote_text"]),
+            quote_label=cast(str, box3["quote_label"]),
+            box3_body=cast(str, box3["body"]),
+            emphasis=cast(str, box3["emphasis"]),
+            tail=cast(str, box3["tail"]),
+            uses_ai=cast(bool, box3["uses_ai"]),
         )
 
     # ── 헬퍼: 악연 slotId 추출 ──────────────────────────────────
