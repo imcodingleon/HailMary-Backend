@@ -22,6 +22,7 @@ env/
 .env.local
 .env.prod
 .env.staging
+.env.test
 .env.*.local
 # .env.example is intentionally NOT ignored
 

@@ -16,5 +16,24 @@ services:
       - mysql_data:/var/lib/mysql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
 
+  # 테스트 전용 DB 컨테이너 (운영과 완전 분리)
+  # APP_ENV=test 모드에서만 사용. 포트 3308 (운영 3306/3307과 충돌 방지).
+  mysql-test:
+    image: mysql:8.0
+    container_name: hailmary-mysql-test
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_TEST_ROOT_PASSWORD:-test}
+      MYSQL_DATABASE: ${MYSQL_TEST_DATABASE:-hailmary_test}
+      MYSQL_USER: ${MYSQL_TEST_USER:-hailmary_test_app}
+      MYSQL_PASSWORD: ${MYSQL_TEST_PASSWORD:-test}
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+    ports:
+      - "127.0.0.1:3308:3306"
+    volumes:
+      - mysql_test_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+
 volumes:
   mysql_data:
+  mysql_test_data:
