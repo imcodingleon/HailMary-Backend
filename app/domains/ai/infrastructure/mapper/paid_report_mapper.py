@@ -8,6 +8,7 @@ class PaidReportMapper:
         return PaidReportORM(
             order_id=entity.order_id,
             saju_hash=entity.saju_hash,
+            share_code=entity.share_code,
             status=entity.status,
             chapters=dict(entity.chapters),
         )
@@ -17,6 +18,7 @@ class PaidReportMapper:
         return PaidReport(
             order_id=orm.order_id,
             saju_hash=orm.saju_hash,
+            share_code=orm.share_code,
             status=orm.status,
             chapters=dict(orm.chapters or {}),
             created_at=orm.created_at,

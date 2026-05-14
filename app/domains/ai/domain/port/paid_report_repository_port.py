@@ -12,3 +12,6 @@ class PaidReportRepositoryPort(ABC):
 
     @abstractmethod
     async def find_ready_by_saju_hash(self, saju_hash: str) -> PaidReport | None: ...
+
+    @abstractmethod
+    async def find_by_share_code(self, share_code: str) -> PaidReport | None: ...
