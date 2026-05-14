@@ -91,9 +91,11 @@ CHEON_EUL_TABLE: dict[HeavenlyStem, tuple[EarthlyBranch, ...]] = {
 V2_BONUS_CAP: int = 30
 
 PERCENTILE_TABLE: tuple[tuple[int, int], ...] = (
-    (0, 0), (10, 5), (20, 10), (28, 15), (34, 20), (40, 28),
-    (46, 36), (52, 45), (58, 54), (63, 62), (68, 70), (73, 77),
-    (78, 83), (83, 88), (89, 93), (95, 97),
+    # 2026-05-14 결정: 결제 사용자 만족도 고려해 분포 후하게 조정.
+    # 최저점도 상위 35% 부터 시작. 평균 점수(40~50)는 상위 70~80%대.
+    (0, 35), (10, 42), (20, 50), (28, 57), (34, 63), (40, 70),
+    (46, 76), (52, 82), (58, 87), (63, 91), (68, 94), (73, 96),
+    (78, 97), (83, 98), (89, 99), (95, 99),
 )
 
 GONG_MANG_TABLE: dict[EarthlyBranch, tuple[EarthlyBranch, ...]] = {
@@ -395,6 +397,17 @@ def _calculate_score(saju: dict[str, Any], dohwa_pillars: list[PillarKey]) -> in
     if has_hwa_gae:
         score += 12 if not dohwa_pillars else 8
 
+    # 도화 부재 시 차상위 매력살로 대체 가산 (2026-05-14 결정).
+    # 도화 pillar 베이스 가산이 빠진 손실을 SAL_PRIORITY 최우선 살로 보충해서
+    # "강렬한 매력" 같은 카피와 점수 라벨의 정합성을 맞춤. 둘 이상 보유 시 우선 살 하나만.
+    if not dohwa_pillars:
+        if "cheon_eul_gwi_in" in sin_sals:
+            score += 25
+        elif "hong_yeom_sal" in sin_sals:
+            score += 25
+        elif "geum_yeo_rok" in sin_sals:
+            score += 20
+
     score += _sum_twelve_phase_bonus(saju)
 
     dist = saju.get("tenGodsDistribution") or {}
@@ -422,64 +435,22 @@ def _calculate_score(saju: dict[str, Any], dohwa_pillars: list[PillarKey]) -> in
     return max(20, min(100, round(score)))
 
 
-def _classify_type(
-    saju: dict[str, Any], dohwa_pillars: list[PillarKey], groups: dict[str, int]
-) -> str:
-    sin_sals = saju.get("sinSals") or []
+# 일간(천간) → 매력 유형 슬러그 매핑.
+# 사용자 결정 (2026-05-14): 무료/유료 결과지 매력 유형 라벨을 일간 10종으로 통일.
+# 기존 사주 구조 분류 (active/passive/expressive/mystery/charisma/dignified/free/
+# withdrawn/balanced 9종) 폐기. 인자는 saju 하나만 필요.
+DAY_STEM_TO_TYPE_KEY: dict[HeavenlyStem, str] = {
+    "갑": "gap",     "을": "eul",
+    "병": "byeong",  "정": "jeong",
+    "무": "mu",      "기": "gi",
+    "경": "gyeong",  "신": "shin",
+    "임": "im",      "계": "gye",
+}
+
+
+def _classify_type(saju: dict[str, Any]) -> str:
     day_stem = cast(HeavenlyStem, saju["day"]["stem"])
-    is_yang_stem = day_stem in YANG_STEMS
-    has_day_or_hour = ("day" in dohwa_pillars) or ("hour" in dohwa_pillars)
-    has_year_or_month = ("year" in dohwa_pillars) or ("month" in dohwa_pillars)
-
-    if has_day_or_hour and is_yang_stem and groups["siksang"] >= 2:
-        return "active"
-
-    if has_year_or_month and not is_yang_stem and (
-        groups["gwangwan"] >= 2 or groups["jaeseong"] >= 2
-    ):
-        return "passive"
-
-    if groups["siksang"] >= 3:
-        return "expressive"
-
-    if (
-        "hwa_gae_sal" in sin_sals
-        and groups["inseong"] >= 2
-        and len(dohwa_pillars) <= 1
-    ):
-        return "mystery"
-
-    if "day" in dohwa_pillars:
-        day_branch = cast(EarthlyBranch, saju["day"]["branch"])
-        day_phase = get_twelve_phase(day_stem, day_branch)
-        if day_phase in ("jewang", "gwandae"):
-            return "charisma"
-
-    if (
-        not dohwa_pillars
-        and groups["gwangwan"] >= 2
-        and groups["jaeseong"] >= 1
-    ):
-        return "dignified"
-
-    if (
-        "yeok_ma_sal" in sin_sals
-        and groups["siksang"] >= 2
-        and len(dohwa_pillars) == 1
-    ):
-        return "free"
-
-    if not dohwa_pillars and "hwa_gae_sal" not in sin_sals:
-        myo_jeol = 0
-        for k in PILLAR_KEYS:
-            b = cast(EarthlyBranch, saju[k]["branch"])
-            p = get_twelve_phase(day_stem, b)
-            if p == "myo" or p == "jeol":
-                myo_jeol += 1
-        if myo_jeol >= 2:
-            return "withdrawn"
-
-    return "balanced"
+    return DAY_STEM_TO_TYPE_KEY[day_stem]
 
 
 def _classify_manifestation(
@@ -535,8 +506,18 @@ def _collect_variant_tags(
         for k in dohwa_pillars:
             tags.append(f"dohwa_pillar_{k}")
 
+    # 매력살 보유 태그 — 도화 부재 시 우선순위(SAL_PRIORITY)에 따라 카피 선정용.
+    # 천을귀인 > 홍염 > 도화 > 금여록 > 화개 > 공망.
+    if "cheon_eul_gwi_in" in sin_sals:
+        tags.append("cheoneul_present")
+    if "hong_yeom_sal" in sin_sals:
+        tags.append("hongyeom_present")
+    if "geum_yeo_rok" in sin_sals:
+        tags.append("geumyeo_present")
     if "hwa_gae_sal" in sin_sals:
         tags.append("hwagae_present")
+    if "gong_mang" in sin_sals:
+        tags.append("gongmang_present")
 
     yong_sin = saju.get("yongSin") or {}
     day_stem_element = saju["day"].get("stemElement")
@@ -562,7 +543,7 @@ class CharmService:
         saju = _augment_charm_signals(saju)
         dohwa_pillars = _find_dohwa_pillars(saju)
         groups = _count_ten_god_groups(saju)
-        type_key = _classify_type(saju, dohwa_pillars, groups)
+        type_key = _classify_type(saju)
         manifestation_key = _classify_manifestation(saju, dohwa_pillars)
         variant_tags = _collect_variant_tags(saju, dohwa_pillars)
         charm_strength = _calculate_score(saju, dohwa_pillars)

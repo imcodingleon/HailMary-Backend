@@ -250,10 +250,18 @@ class MonthlyRomanceFlowService:
     def calculate(self, saju: dict[str, Any]) -> dict[str, Any]:
         months = self.compute_full_months(saju)
 
-        # peak_index 재추출 (compute_full_months에서 isPeak True인 row 위치)
-        peak_index = next(
-            (i for i, m in enumerate(months) if m["isPeak"]), 0
+        # 무료 화면 PEAK은 locked 영역(months[2:])에서만 선정.
+        # 디자인 약속: visible 2개 = 무료 공개, 첫 locked = PEAK = 결제 유도 미끼.
+        # 진짜 12개월 최대값이 이번달/다음달에 떨어지면 결제 유도가 무력화되고
+        # UI 일관성도 깨짐(PEAK 위치가 1·2번째 행으로 흔들림). 따라서 visible은
+        # 항상 isPeak=False 강제, PEAK은 locked 영역의 score 최대값으로 위장.
+        # 진짜 PEAK은 P-8 (유료 12개월 운명선)에서 compute_full_months() 결과로 노출.
+        locked_months = months[2:]
+        locked_peak_local = max(
+            range(len(locked_months)),
+            key=lambda i: locked_months[i]["romanceScore"],
         )
+        peak_index = 2 + locked_peak_local  # months 기준 절대 인덱스
 
         first = months[0]
         second = months[1]
@@ -262,16 +270,18 @@ class MonthlyRomanceFlowService:
             "monthLabel": f"{first['month']}월",
             "percentage": first["romanceScore"],
             "hearts": _pct_to_hearts(first["romanceScore"]),
-            "isPeak": first["isPeak"],
+            "isPeak": False,
         }
         v1 = {
             "monthLabel": f"{second['month']}월",
             "percentage": second["romanceScore"],
             "hearts": _pct_to_hearts(second["romanceScore"]),
-            "isPeak": second["isPeak"],
+            "isPeak": False,
         }
 
-        peak_offset = 0 if peak_index in (0, 1) else peak_index - 1
+        # locked 영역 내 인덱스를 visible 다음 오프셋으로 변환.
+        # peak_index=2 → 첫 locked → offset=1 (= 3번째 행).
+        peak_offset = peak_index - 1
 
         return {
             "visibleMonths": [v0, v1],
