@@ -1,0 +1,91 @@
+name: Deploy Backend STAGING to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: backend-deploy-staging
+  cancel-in-progress: true
+
+env:
+  APP_DIR: /home/ec2-user/hailmary-backend-staging
+  UV_BIN: /home/ec2-user/.local/bin/uv
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, hailmary-backend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync source to ${{ env.APP_DIR }}
+        run: |
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.venv' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='fortuneteller-main' \
+            --exclude='fortuneteller-main.zip' \
+            --exclude='docker-compose.yml' \
+            ./ "$APP_DIR/"
+
+      - name: Write .env.staging
+        run: |
+          umask 077
+          cat > "$APP_DIR/.env.staging" <<EOF
+          APP_ENV=test
+          DATABASE_URL=${{ secrets.STAGING_DATABASE_URL }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE=hailmary_staging
+          MYSQL_USER=${{ secrets.MYSQL_USER }}
+          FORTUNETELLER_URL=${{ secrets.FORTUNETELLER_URL }}
+          JWT_SECRET=${{ secrets.STAGING_JWT_SECRET }}
+          TOSS_SECRET_KEY=${{ secrets.TOSS_SECRET_KEY }}
+          TOSS_BASE_URL=${{ secrets.TOSS_BASE_URL }}
+          AMPLITUDE_API_KEY=${{ secrets.AMPLITUDE_API_KEY }}
+          AMPLITUDE_BASE_URL=${{ secrets.AMPLITUDE_BASE_URL }}
+          CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
+          CLAUDE_MODEL=${{ secrets.CLAUDE_MODEL }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          AWS_SES_SENDER=${{ secrets.AWS_SES_SENDER }}
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          QA_USERNAME=${{ secrets.QA_USERNAME }}
+          QA_PASSWORD=${{ secrets.QA_PASSWORD }}
+          QA_ACCESS_TOKEN=${{ secrets.QA_ACCESS_TOKEN }}
+          EOF
+
+      - name: Install dependencies (uv sync)
+        working-directory: ${{ env.APP_DIR }}
+        run: $UV_BIN sync --frozen
+
+      - name: Run database migrations
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -a
+          . "$APP_DIR/.env.staging"
+          set +a
+          $UV_BIN run alembic upgrade head
+
+      - name: Restart staging backend service
+        run: sudo /usr/bin/systemctl restart hailmary-backend-staging.service
+
+      - name: Wait for /health
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://staging-api.dohwaseonsaju.com/health || true)
+            if [ "$code" = "200" ]; then
+              echo "Staging backend healthy"
+              exit 0
+            fi
+            echo "[$i/30] status=$code, retry in 2s"
+            sleep 2
+          done
+          echo "::error::Staging backend did not become healthy in 60s"
+          sudo /usr/bin/journalctl -u hailmary-backend-staging.service --since '2 minutes ago' --no-pager | tail -80
+          exit 1
