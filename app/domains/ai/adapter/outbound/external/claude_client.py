@@ -21,7 +21,9 @@ class ClaudeClient(AIClientPort):
     """
 
     def __init__(self, *, api_key: str, model: str) -> None:
-        self._client = AsyncAnthropic(api_key=api_key)
+        # max_retries=5: 기본 2회로는 Anthropic 529(Overloaded) 지속 시 부족.
+        # SDK가 5xx/429/408에 expo backoff(retry-after 헤더 우선) 적용.
+        self._client = AsyncAnthropic(api_key=api_key, max_retries=5)
         self._model = model
 
     async def generate_chapter(
