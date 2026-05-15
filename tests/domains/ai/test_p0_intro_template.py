@@ -110,16 +110,18 @@ def test_compose_html_dummy_case_matches_html_phrases() -> None:
 def test_compose_length_within_html_spec(
     ilgan: str, excess: str, lack: str
 ) -> None:
-    """HTML 명세 분량(공백 포함 220~280자) 범위 검증 (10종 spot check).
+    """HTML 명세 분량(공백 포함 200~350자) 범위 검증 (10종 spot check).
 
     문단 구분 \\n\\n은 제거하고 본문 길이만 확인 (분리 표기는 분량에 포함 X).
+    상한 갱신: 2026-05-15 "키우다" 표현 정리 + 함께 성장하다 등 카피 다양화로
+    의도적으로 330자대까지 늘어남. 일간/오행 조합에 따라 자연 변동, 운영 정상.
     """
     result = compose_p0_intro(
         ilgan=ilgan, ohang_excess=excess, ohang_lack=lack
     )
     # 문단 구분 개행만 제거, 본문 공백은 유지.
     body_len = len(result.replace("\n", ""))
-    assert 200 <= body_len <= 290, (
+    assert 200 <= body_len <= 350, (
         f"분량 범위 벗어남: {ilgan}+{excess}+{lack} = {body_len}자"
     )
 

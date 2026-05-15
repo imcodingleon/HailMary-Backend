@@ -177,8 +177,10 @@ class TestV2Bonus:
         result = CharmService().calculate(saju)
         assert result["charmStrength"] > 20, "floor 탈출 실패"
         # 도화 가중치 없음(도화 자 미적중) + 홍염 hit + 자좌홍염 + 도화일주
-        # + 공망×홍염 페널티 + 12운성 큰 마이너스. 25~50 범위.
-        assert 25 <= result["charmStrength"] <= 50, (
+        # + 공망×홍염 페널티 + 12운성 큰 마이너스. 25~60 범위.
+        # 상한 갱신: 2026-05-15 매력 v3 도화 부재 대체 가산(천을 +25 / 홍염 +25)
+        # 도입으로 합산 자연스레 50 초과 가능. 56점도 정상 운영 분포.
+        assert 25 <= result["charmStrength"] <= 60, (
             f"실제 점수 {result['charmStrength']}"
         )
 
