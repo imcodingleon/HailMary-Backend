@@ -1,9 +1,9 @@
 name: Deploy Backend to EC2
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+# NOTE: 자동 push 트리거 제거 — prod 배포는 항상 수동(workflow_dispatch)으로만.
+# staging은 main push 시 자동 배포되어 검증 → 검증 끝나면 GitHub UI에서 prod 워크플로 수동 실행.
 
 concurrency:
   group: backend-deploy
