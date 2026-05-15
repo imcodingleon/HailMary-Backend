@@ -28,6 +28,7 @@ from app.domains.ai.domain.port.paid_report_repository_port import (
     PaidReportRepositoryPort,
 )
 from app.domains.ai.domain.templates.yeonwoo_p10_letter import compose_box3
+from app.domains.ai.domain.value_object.character_persona import YEONWOO_PERSONA
 from app.domains.ai.domain.value_object.report_status import ReportStatus
 
 if TYPE_CHECKING:
@@ -220,6 +221,8 @@ class CreatePaidReportUseCase:
 
             try:
                 ai_body = await self._p10_letter_usecase.execute(
+                    # TODO(도윤): 캐릭터별 페르소나 분기점. 현재 강연우 고정.
+                    persona=YEONWOO_PERSONA,
                     ilgan=_ilgan_with_hanja(ilgan),
                     ilju=response.p10.ilju_with_hanja,
                     ohang_excess=_ohang_with_hanja(ohang_excess),

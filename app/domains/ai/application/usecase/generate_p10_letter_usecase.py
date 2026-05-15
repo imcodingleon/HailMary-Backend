@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from app.domains.ai.domain.port.ai_client_port import AIClientPort
 from app.domains.ai.domain.service.p10_letter_prompt import build_p10_system_prompt
+from app.domains.ai.domain.value_object.character_persona import CharacterPersona
 
 
 class GenerateP10LetterUseCase:
@@ -22,6 +23,7 @@ class GenerateP10LetterUseCase:
     async def execute(
         self,
         *,
+        persona: CharacterPersona,
         ilgan: str,
         ilju: str,
         ohang_excess: str,
@@ -33,10 +35,14 @@ class GenerateP10LetterUseCase:
     ) -> str:
         """AI 호출로 박스 3 가운데 단락 생성.
 
+        Args:
+            persona: 캐릭터 페르소나 (강연우 / 한도윤 등). system prompt 분기점.
+
         Returns:
             AI 응답 텍스트 (300~400자 도화선 톤 답장).
         """
         system_prompt, user_prompt = build_p10_system_prompt(
+            persona=persona,
             ilgan=ilgan,
             ilju=ilju,
             ohang_excess=ohang_excess,
