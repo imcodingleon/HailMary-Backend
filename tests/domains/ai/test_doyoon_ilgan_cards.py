@@ -44,4 +44,4 @@ def test_html_dummy_imsu_card_shape() -> None:
     assert card.name_han == "壬水"
     assert "큰 물" in card.subtitle
     assert "1.7배" in card.data_traits[0]
-    assert "0.4배" in card.data_traits[1]
+    assert "평균 대비 0.4배" in card.data_traits[1]

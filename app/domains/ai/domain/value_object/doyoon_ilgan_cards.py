@@ -159,7 +159,7 @@ DOYOON_ILGAN_CARDS: dict[str, DoyoonIlganCard] = {
         subtitle="큰 물 / 깊은 바다 유형",
         data_traits=(
             "깊이감 평균 대비 1.7배",
-            "표현 빈도 0.4배",
+            "표현 빈도 평균 대비 0.4배",
             "감정 회복 속도 1.4배 느림",
         ),
         love_variables=(
