@@ -204,6 +204,7 @@ def _make_confirm_payment_usecase(
             ses_client=ses_client,
             base_url=base_url,
         )
+    user_repo = UserRepository(session)
     create_paid_report_usecase = CreatePaidReportUseCase(
         paid_report_repo=paid_report_repo,
         saju_result_repo=SajuResultRepository(session),
@@ -211,8 +212,8 @@ def _make_confirm_payment_usecase(
         compose_usecase=ComposePaidReportUseCase(),
         p10_letter_usecase=p10_letter_usecase,
         email_sender=email_sender,
+        user_repo=user_repo,
     )
-    user_repo = UserRepository(session)
     saju_hash_resolver = SajuHashResolver(
         user_repo=user_repo,
         saju_result_repo=SajuResultRepository(session),

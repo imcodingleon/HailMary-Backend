@@ -32,11 +32,13 @@ class GenerateP10LetterUseCase:
         box2_body: str,
         step3: str,
         emphasis: str,
+        user_name: str | None = None,
     ) -> str:
         """AI 호출로 박스 3 가운데 단락 생성.
 
         Args:
             persona: 캐릭터 페르소나 (강연우 / 한도윤 등). system prompt 분기점.
+            user_name: 도윤일 때 필수 (호명용). 연우일 때 무시.
 
         Returns:
             AI 응답 텍스트 (300~400자 도화선 톤 답장).
@@ -51,6 +53,7 @@ class GenerateP10LetterUseCase:
             box2_body=box2_body,
             step3=step3,
             emphasis=emphasis,
+            user_name=user_name,
         )
         return await self._ai_client.generate_chapter(
             system_prompt=system_prompt,

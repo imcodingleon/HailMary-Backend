@@ -35,10 +35,9 @@ YEONWOO_PERSONA = CharacterPersona(
     tone_hint="따뜻한 인정과 다정한 위로",
 )
 
-# 도윤 추가 시 여기에 DOYOON_PERSONA 정의.
-# DOYOON_PERSONA = CharacterPersona(
-#     name="한도윤",
-#     role="...",
-#     signature_phrase="...",
-#     tone_hint="...",
-# )
+DOYOON_PERSONA = CharacterPersona(
+    name="한도윤",
+    role="사주 데이터 분석가",
+    signature_phrase="표본 / 분포 / 임계점 / 전환율 / 상관 / 회귀 / 점수",
+    tone_hint="존댓말, 분석적, 따뜻함은 절제 — 숫자 뒤에 한 줄",
+)

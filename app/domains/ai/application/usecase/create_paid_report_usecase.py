@@ -28,7 +28,10 @@ from app.domains.ai.domain.port.paid_report_repository_port import (
     PaidReportRepositoryPort,
 )
 from app.domains.ai.domain.templates.yeonwoo_p10_letter import compose_box3
-from app.domains.ai.domain.value_object.character_persona import YEONWOO_PERSONA
+from app.domains.ai.domain.value_object.character_persona import (
+    DOYOON_PERSONA,
+    YEONWOO_PERSONA,
+)
 from app.domains.ai.domain.value_object.report_status import ReportStatus
 
 if TYPE_CHECKING:
@@ -43,6 +46,9 @@ if TYPE_CHECKING:
     )
     from app.domains.user.adapter.outbound.persistence.survey_repository import (
         SurveyRepository,
+    )
+    from app.domains.user.adapter.outbound.persistence.user_repository import (
+        UserRepository,
     )
 
 logger = logging.getLogger(__name__)
@@ -94,6 +100,7 @@ class CreatePaidReportUseCase:
         compose_usecase: ComposePaidReportUseCase | None = None,
         p10_letter_usecase: GenerateP10LetterUseCase | None = None,
         email_sender: SendResultLinkEmailUseCase | None = None,
+        user_repo: UserRepository | None = None,
     ) -> None:
         self._repo = paid_report_repo
         self._saju_result_repo = saju_result_repo
@@ -101,6 +108,7 @@ class CreatePaidReportUseCase:
         self._compose_usecase = compose_usecase
         self._p10_letter_usecase = p10_letter_usecase
         self._email_sender = email_sender
+        self._user_repo = user_repo
 
     async def execute(
         self,
@@ -131,7 +139,7 @@ class CreatePaidReportUseCase:
             and self._compose_usecase is not None
         ):
             try:
-                chapters = await self._compose_chapters(user_id)
+                chapters = await self._compose_chapters(user_id, character)
                 if chapters:
                     report.mark_ready(chapters)
             except Exception:
@@ -179,8 +187,13 @@ class CreatePaidReportUseCase:
         _PENDING_EMAIL_TASKS.add(task)
         task.add_done_callback(_PENDING_EMAIL_TASKS.discard)
 
-    async def _compose_chapters(self, user_id: int) -> dict[str, Any]:
-        """user_id로 saju/survey 조회 → P-0~P-10 합성 → chapters dict 반환."""
+    async def _compose_chapters(
+        self, user_id: int, character: str | None
+    ) -> dict[str, Any]:
+        """user_id로 saju/survey 조회 → P-0~P-10 합성 → chapters dict 반환.
+
+        character로 P-10 persona 분기. 도윤일 때만 user_name 조회 (호명용).
+        """
         assert self._saju_result_repo is not None
         assert self._survey_repo is not None
         assert self._compose_usecase is not None
@@ -198,6 +211,19 @@ class CreatePaidReportUseCase:
         step2: tuple[str, ...] = tuple(survey.step2_slugs) if survey else ()
         step3: str | None = survey.step3_text if survey else None
 
+        # 도윤일 때 user_name 미리 조회 (P-0 호명용). 연우일 땐 None 그대로.
+        user_name_for_compose: str | None = None
+        if character == "doyoon" and self._user_repo is not None:
+            user_for_p0 = await self._user_repo.find_by_id(user_id)
+            user_name_for_compose = user_for_p0.name if user_for_p0 else None
+            if user_name_for_compose is None:
+                logger.warning(
+                    "doyoon p0 wanted user_name but user not found, user_id=%s",
+                    user_id,
+                )
+                # 도윤이지만 user 없으면 합성 자체 불가 → 연우 fallback
+                # (실제 운영에선 거의 불가능 — Payment.user_id가 결제 시 박혀 있음)
+
         # 1차 합성 — P-0~P-9 + P-10 (AI 없음, 폴백 박스 3)
         response = self._compose_usecase.execute(
             saju_raw,
@@ -205,6 +231,8 @@ class CreatePaidReportUseCase:
             step2=step2,
             step3=step3,
             ai_letter_body=None,
+            character=character or "yeonwoo",
+            user_name=user_name_for_compose,
         )
 
         # 2차 — step3 있고 AI 가능하면 AI 답장 → 박스 3 갱신
@@ -219,10 +247,14 @@ class CreatePaidReportUseCase:
             ohang_excess = vars_.get("OHANG_EXCESS", "")
             ohang_lack = vars_.get("OHANG_LACK", "")
 
+            # 캐릭터별 페르소나 분기. user_name은 P-0에서 이미 조회됨 (재사용).
+            persona = DOYOON_PERSONA if character == "doyoon" else YEONWOO_PERSONA
+            user_name = user_name_for_compose
+
             try:
                 ai_body = await self._p10_letter_usecase.execute(
-                    # TODO(도윤): 캐릭터별 페르소나 분기점. 현재 강연우 고정.
-                    persona=YEONWOO_PERSONA,
+                    persona=persona,
+                    user_name=user_name,
                     ilgan=_ilgan_with_hanja(ilgan),
                     ilju=response.p10.ilju_with_hanja,
                     ohang_excess=_ohang_with_hanja(ohang_excess),

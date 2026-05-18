@@ -73,6 +73,37 @@ class PaidChapterP0(BaseModel):
 
 
 # ═════════════════════════════════════════════════════════════════
+# P-0 도윤 패널 (별도 chapters 키 `p0_doyoon`)
+# ═════════════════════════════════════════════════════════════════
+
+
+class DoyoonIlganCardP0(BaseModel):
+    """도윤 P-0 0-3 일간 카드 — 3 섹션 (데이터 특성·연애 변수·충돌)."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    name_kor: str
+    name_han: str
+    subtitle: str
+    data_traits: list[str]      # 3
+    love_variables: list[str]   # 3
+    main_conflict: str
+
+
+class PaidChapterP0Doyoon(BaseModel):
+    """P-0 도윤 패널 — saju_pillars + ohang + user_name(호명) + 도윤 ilgan_card + ai_intro."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    saju_pillars: SajuPillarsP0          # 연우와 공유 스키마
+    ohang_strength: OhangStrength        # 연우와 공유
+    ohang_excess: OhangKey
+    ohang_lack: OhangKey
+    ilgan: str
+    user_name: str                       # 호명용
+    ilgan_card: DoyoonIlganCardP0
+    ai_intro: str                        # 4단락 합성
+
+
+# ═════════════════════════════════════════════════════════════════
 # P-1 一 너라는 사람 (1/2)
 # ═════════════════════════════════════════════════════════════════
 
@@ -417,6 +448,7 @@ class PaidChaptersResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     p0: PaidChapterP0 | None = None
+    p0_doyoon: PaidChapterP0Doyoon | None = None
     p1: PaidChapterP1 | None = None
     p2: PaidChapterP2 | None = None
     p3: PaidChapterP3 | None = None
@@ -464,4 +496,5 @@ class PaidReportResponse(BaseModel):
     status: str
     chapters: PaidChaptersResponse  # ← dict[str, str]에서 명시 타입으로 변경
     expires_at: datetime
+    character: Literal["yeonwoo", "doyoon"]  # Payment.character.value
     user: PaidUserPropertiesResponse | None = None

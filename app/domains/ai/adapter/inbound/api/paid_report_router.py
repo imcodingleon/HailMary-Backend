@@ -86,8 +86,9 @@ async def get_report(
     return PaidReportResponse(
         order_id=report.order_id,
         status=report.status.value,
-        chapters=report.chapters,  # type: ignore[arg-type]
+        chapters=report.chapters,
         expires_at=payment.expires_at,
+        character=payment.character.value,
         user=_build_user_properties(user, payment.customer_email),
     )
 
@@ -134,7 +135,8 @@ async def get_report_by_share(
     return PaidReportResponse(
         order_id=report.order_id,
         status=report.status.value,
-        chapters=report.chapters,  # type: ignore[arg-type]
+        chapters=report.chapters,
         expires_at=payment.expires_at,
+        character=payment.character.value,
         user=_build_user_properties(user, payment.customer_email),
     )

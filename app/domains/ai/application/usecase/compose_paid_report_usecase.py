@@ -21,6 +21,7 @@ from app.domains.ai.application.response.paid_report_response import (
     CandleRow,
     CharmPracticeCard,
     CharmSalView,
+    DoyoonIlganCardP0,
     EndingCard,
     IlganCardP0,
     IllusionGoodCard,
@@ -32,6 +33,7 @@ from app.domains.ai.application.response.paid_report_response import (
     OhangMethodCard,
     OhangStrength,
     PaidChapterP0,
+    PaidChapterP0Doyoon,
     PaidChapterP1,
     PaidChapterP2,
     PaidChapterP3,
@@ -50,6 +52,7 @@ from app.domains.ai.application.response.paid_report_response import (
     SajuPillarsP0,
     StageCard,
 )
+from app.domains.ai.domain.templates.doyoon_p0_intro import compose_doyoon_p0_intro
 from app.domains.ai.domain.templates.yeonwoo_p0_intro import compose_p0_intro
 from app.domains.ai.domain.templates.yeonwoo_p1_chapter_opening import (
     compose_p1_chapter_opening,
@@ -88,6 +91,7 @@ from app.domains.ai.domain.templates.yeonwoo_p10_letter import (
     compose_box2_body,
     compose_box3,
 )
+from app.domains.ai.domain.value_object.doyoon_ilgan_cards import DOYOON_ILGAN_CARDS
 from app.domains.ai.domain.value_object.ilgan_cards import get_ilgan_card
 from app.domains.user.domain.service.charm_service import CharmService
 from app.domains.user.domain.service.monthly_romance_flow_service import (
@@ -180,6 +184,8 @@ class ComposePaidReportUseCase:
         step2: tuple[str, ...] = (),
         step3: str | None = None,
         ai_letter_body: str | None = None,
+        character: str = "yeonwoo",
+        user_name: str | None = None,
     ) -> PaidChaptersResponse:
         """사주 raw → 12 페이지 응답 (P-0~P-10).
 
@@ -190,6 +196,8 @@ class ComposePaidReportUseCase:
             step3: 설문 자유 텍스트 (P-10 박스 3 quote + AI 답장 트리거).
             ai_letter_body: P-10 AI 호출 결과. None이면 폴백 (compose_box3 내부).
                 AI 호출은 별도 비동기 경로에서 수행되고 그 결과를 여기 주입.
+            character: "yeonwoo" 또는 "doyoon". 도윤일 때 p0_doyoon 합성.
+            user_name: 도윤일 때 필수 (P-0 호명용).
         """
         if start_year is None or start_month is None:
             now = datetime.now()
@@ -214,8 +222,19 @@ class ComposePaidReportUseCase:
         p6 = self._build_p6(ilgan, match_slot_id, ohang_lack)
         p8 = self._build_p8(saju_raw, ilgan, start_year, start_month)
 
+        # 도윤 P-0는 별도 chapters key (p0_doyoon). 다른 페이지는 점진 추가 예정.
+        if character == "doyoon":
+            p0_doyoon = self._build_p0_doyoon(
+                vars_, ilgan, ohang_excess, ohang_lack, user_name or ""
+            )
+            p0_yeonwoo = None
+        else:
+            p0_doyoon = None
+            p0_yeonwoo = self._build_p0(vars_, ilgan, ohang_excess, ohang_lack)
+
         return PaidChaptersResponse(
-            p0=self._build_p0(vars_, ilgan, ohang_excess, ohang_lack),
+            p0=p0_yeonwoo,
+            p0_doyoon=p0_doyoon,
             p1=self._build_p1(ilgan, ilju),
             p2=self._build_p2(ilgan),
             p3=self._build_p3(ilgan, ohang_excess),
@@ -275,6 +294,58 @@ class ComposePaidReportUseCase:
             ilgan=ilgan,
             ilgan_card=ilgan_card,
             ai_intro=compose_p0_intro(
+                ilgan=ilgan,
+                ohang_excess=ohang_excess,
+                ohang_lack=ohang_lack,
+            ),
+        )
+
+    # ── P-0 (도윤 패널) ──────────────────────────────────────
+    def _build_p0_doyoon(
+        self,
+        vars_: dict[str, Any],
+        ilgan: str,
+        ohang_excess: str,
+        ohang_lack: str,
+        user_name: str,
+    ) -> PaidChapterP0Doyoon:
+        """도윤 P-0 합성 — 8글자 + 오행 5강도 + 도윤 일간 카드 + 4단락 ai_intro.
+
+        user_name 비어 있으면 KeyError·ValueError로 합성 자체가 실패 →
+        호출자 (create_paid_report_usecase)가 graceful 처리.
+        """
+        pillars = SajuPillarsP0(
+            si_g=vars_["SI_G"], si_j=vars_["SI_J"],
+            il_g=vars_["IL_G"], il_j=vars_["IL_J"],
+            wl_g=vars_["WL_G"], wl_j=vars_["WL_J"],
+            yr_g=vars_["YR_G"], yr_j=vars_["YR_J"],
+        )
+        strength = OhangStrength(
+            mok=vars_["OHANG_MOK"],
+            hwa=vars_["OHANG_HWA"],
+            to=vars_["OHANG_TO"],
+            geum=vars_["OHANG_GEUM"],
+            su=vars_["OHANG_SU"],
+        )
+        dy_card = DOYOON_ILGAN_CARDS[ilgan]
+        ilgan_card = DoyoonIlganCardP0(
+            name_kor=dy_card.name_kor,
+            name_han=dy_card.name_han,
+            subtitle=dy_card.subtitle,
+            data_traits=list(dy_card.data_traits),
+            love_variables=list(dy_card.love_variables),
+            main_conflict=dy_card.main_conflict,
+        )
+        return PaidChapterP0Doyoon(
+            saju_pillars=pillars,
+            ohang_strength=strength,
+            ohang_excess=_ohang_code(ohang_excess),
+            ohang_lack=_ohang_code(ohang_lack),
+            ilgan=ilgan,
+            user_name=user_name,
+            ilgan_card=ilgan_card,
+            ai_intro=compose_doyoon_p0_intro(
+                user_name=user_name,
                 ilgan=ilgan,
                 ohang_excess=ohang_excess,
                 ohang_lack=ohang_lack,
