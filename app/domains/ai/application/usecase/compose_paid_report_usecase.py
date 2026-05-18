@@ -22,6 +22,7 @@ from app.domains.ai.application.response.paid_report_response import (
     CharmPracticeCard,
     CharmSalView,
     DoyoonIlganCardP0,
+    EmotionPointDoyoon,
     EndingCard,
     IlganCardP0,
     IllusionGoodCard,
@@ -35,6 +36,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP0,
     PaidChapterP0Doyoon,
     PaidChapterP1,
+    PaidChapterP1Doyoon,
     PaidChapterP2,
     PaidChapterP3,
     PaidChapterP4,
@@ -53,6 +55,9 @@ from app.domains.ai.application.response.paid_report_response import (
     StageCard,
 )
 from app.domains.ai.domain.templates.doyoon_p0_intro import compose_doyoon_p0_intro
+from app.domains.ai.domain.templates.doyoon_p1_emotion import compose_doyoon_p1_emotion
+from app.domains.ai.domain.templates.doyoon_p1_opening import compose_doyoon_p1_opening
+from app.domains.ai.domain.templates.doyoon_p1_trigger import compose_doyoon_p1_trigger
 from app.domains.ai.domain.templates.yeonwoo_p0_intro import compose_p0_intro
 from app.domains.ai.domain.templates.yeonwoo_p1_chapter_opening import (
     compose_p1_chapter_opening,
@@ -92,6 +97,7 @@ from app.domains.ai.domain.templates.yeonwoo_p10_letter import (
     compose_box3,
 )
 from app.domains.ai.domain.value_object.doyoon_ilgan_cards import DOYOON_ILGAN_CARDS
+from app.domains.ai.domain.value_object.doyoon_p1_data import DOYOON_P1_DATA
 from app.domains.ai.domain.value_object.ilgan_cards import get_ilgan_card
 from app.domains.user.domain.service.charm_service import CharmService
 from app.domains.user.domain.service.monthly_romance_flow_service import (
@@ -222,20 +228,25 @@ class ComposePaidReportUseCase:
         p6 = self._build_p6(ilgan, match_slot_id, ohang_lack)
         p8 = self._build_p8(saju_raw, ilgan, start_year, start_month)
 
-        # 도윤 P-0는 별도 chapters key (p0_doyoon). 다른 페이지는 점진 추가 예정.
+        # 도윤 P-0, P-1는 별도 chapters key. 다른 페이지는 점진 추가 예정.
         if character == "doyoon":
             p0_doyoon = self._build_p0_doyoon(
                 vars_, ilgan, ohang_excess, ohang_lack, user_name or ""
             )
+            p1_doyoon = self._build_p1_doyoon(ilgan, ilju, user_name or "")
             p0_yeonwoo = None
+            p1_yeonwoo = None
         else:
             p0_doyoon = None
+            p1_doyoon = None
             p0_yeonwoo = self._build_p0(vars_, ilgan, ohang_excess, ohang_lack)
+            p1_yeonwoo = self._build_p1(ilgan, ilju)
 
         return PaidChaptersResponse(
             p0=p0_yeonwoo,
             p0_doyoon=p0_doyoon,
-            p1=self._build_p1(ilgan, ilju),
+            p1=p1_yeonwoo,
+            p1_doyoon=p1_doyoon,
             p2=self._build_p2(ilgan),
             p3=self._build_p3(ilgan, ohang_excess),
             p4=self._build_p4(ilgan, akyon_slot_id, ohang_excess),
@@ -350,6 +361,48 @@ class ComposePaidReportUseCase:
                 ohang_excess=ohang_excess,
                 ohang_lack=ohang_lack,
             ),
+        )
+
+    # ── P-1 (도윤 패널) ──────────────────────────────────────
+    def _build_p1_doyoon(
+        self, ilgan: str, ilju: str, user_name: str
+    ) -> PaidChapterP1Doyoon:
+        """도윤 P-1 합성 — 연애 유형 + 트리거 flow + 감정 곡선 + 3 AI 슬롯 룰 합성."""
+        data = DOYOON_P1_DATA[ilgan]
+        labels = ("초반", "중반", "위기", "회복")
+        curve = [
+            EmotionPointDoyoon(
+                label=labels[i],
+                pct=data.emotion_curve[i],
+                is_crisis=(labels[i] == "위기"),
+            )
+            for i in range(4)
+        ]
+        return PaidChapterP1Doyoon(
+            user_name=user_name,
+            ilgan=_ilgan_with_hanja(ilgan),
+            ilju=_ilju_with_hanja(ilju),
+            love_type=data.love_type,
+            pct_value=data.pct_value,
+            distribution_pct=data.distribution_pct,
+            ai_opening=compose_doyoon_p1_opening(
+                user_name=user_name,
+                ilgan=ilgan,
+                ilju=_ilju_with_hanja(ilju),
+            ),
+            trigger_1=data.trigger_1,
+            trigger_2=data.trigger_2,
+            trigger_3=data.trigger_3,
+            trigger_flow_pcts=(30, 62, 88),
+            ai_trigger=compose_doyoon_p1_trigger(
+                user_name=user_name, ilgan=ilgan
+            ),
+            emotion_curve=curve,
+            crisis_multiplier=data.crisis_multiplier,
+            ai_emotion=compose_doyoon_p1_emotion(
+                user_name=user_name, ilgan=ilgan
+            ),
+            bubble_quote="이거 알고 계신 것만으로도 달라져요. 진짜로요.",
         )
 
     # ── P-1 ──────────────────────────────────────────────────

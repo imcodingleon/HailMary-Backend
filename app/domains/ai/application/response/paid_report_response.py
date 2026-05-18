@@ -104,6 +104,48 @@ class PaidChapterP0Doyoon(BaseModel):
 
 
 # ═════════════════════════════════════════════════════════════════
+# P-1 도윤 패널 (별도 chapters 키 `p1_doyoon`)
+# ═════════════════════════════════════════════════════════════════
+
+
+class EmotionPointDoyoon(BaseModel):
+    """P-1 1-3 감정 곡선 4 데이터 포인트."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    label: str       # "초반" / "중반" / "위기" / "회복"
+    pct: int         # 0~100
+    is_crisis: bool  # 위기 강조 표시
+
+
+class PaidChapterP1Doyoon(BaseModel):
+    """P-1 도윤 패널 — 1-1 연애 유형 + 1-2 트리거 flow + 1-3 감정 곡선.
+
+    HTML 도윤_final.html line 1974~2096 매핑.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_name: str
+    ilgan: str                           # 한자 표기 "임수(壬水)"
+    ilju: str                            # 한자 표기 "임술(壬戌)"
+    # 1-1
+    love_type: str
+    pct_value: int
+    distribution_pct: float              # 12.4
+    ai_opening: str                      # 4단락 350~400자
+    # 1-2
+    trigger_1: str
+    trigger_2: str
+    trigger_3: str
+    trigger_flow_pcts: tuple[int, int, int]   # (30, 62, 88) 고정
+    ai_trigger: str                      # 2단락 200~250자
+    # 1-3
+    emotion_curve: list[EmotionPointDoyoon]   # 4
+    crisis_multiplier: str               # "1.8배"
+    ai_emotion: str                      # 3단락 250~300자
+    bubble_quote: str                    # 1-3 끝 한도윤 멘트 (고정)
+
+
+# ═════════════════════════════════════════════════════════════════
 # P-1 一 너라는 사람 (1/2)
 # ═════════════════════════════════════════════════════════════════
 
@@ -450,6 +492,7 @@ class PaidChaptersResponse(BaseModel):
     p0: PaidChapterP0 | None = None
     p0_doyoon: PaidChapterP0Doyoon | None = None
     p1: PaidChapterP1 | None = None
+    p1_doyoon: PaidChapterP1Doyoon | None = None
     p2: PaidChapterP2 | None = None
     p3: PaidChapterP3 | None = None
     p4: PaidChapterP4 | None = None
