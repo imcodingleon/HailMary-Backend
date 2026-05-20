@@ -243,6 +243,7 @@ def _make_get_paid_report_usecase(
     return GetPaidReportUseCase(
         paid_report_repo=PaidReportRepository(session),
         payment_repo=PaymentRepository(session),
+        user_repo=UserRepository(session),
     )
 
 
