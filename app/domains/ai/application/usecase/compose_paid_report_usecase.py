@@ -417,44 +417,51 @@ class ComposePaidReportUseCase:
     def _build_p2_doyoon(
         self, ilgan: str, user_name: str
     ) -> PaidChapterP2Doyoon | None:
-        """도윤 P-2 합성 — 약점 트리거 + 회복 곡선.
+        """도윤 P-2 합성 — 원본 도윤_final.html 구조 정합 (재설계 2026-05-21).
 
-        본 세션 임수 셀만 정성 완성, 나머지 9 셀은 압축. 향후 사용자 검수.
+        - 1-4: hurt_type × 2 (keyword + risk_pct + desc)
+        - 1-5: meters × 4 (직후/1개월/3개월/6개월 %) + SD + 한도윤 버블
+
         ilgan unknown 시 None 반환 (graceful — 프론트 MOCK fallback).
         """
         try:
             hurt = compose_doyoon_p2_hurt(user_name=user_name, ilgan=ilgan)
-            recovery_dict = compose_doyoon_p2_recovery(
+            recovery = compose_doyoon_p2_recovery(
                 user_name=user_name, ilgan=ilgan
             )
         except (KeyError, ValueError):
             return None
 
+        from app.domains.ai.application.response.paid_report_response import (
+            HurtTypeDoyoon,
+            RecoveryMeterDoyoon,
+        )
         from app.domains.ai.domain.value_object.doyoon_p2_data import (
             DOYOON_P2_DATA,
         )
         data = DOYOON_P2_DATA[ilgan]
-        timeline_rows = [
-            RecoveryTimelineRow(**cast(dict[str, str], row))
-            for row in cast(list[dict[str, str]], recovery_dict["timeline"])
-        ]
-        accel_dict = cast(dict[str, str], recovery_dict["accel"])
-        accel = RecoveryAccel(value=accel_dict["value"], sub=accel_dict["sub"])
 
         return PaidChapterP2Doyoon(
             user_name=user_name,
-            scenario_1_when=hurt["scenario_1_when"],
-            scenario_1_desc=hurt["scenario_1_desc"],
-            scenario_2_when=hurt["scenario_2_when"],
-            scenario_2_desc=hurt["scenario_2_desc"],
-            vulnerability_pct=data.vulnerability_pct,
-            common_pattern_pct=data.common_pattern_pct,
+            hurt_type_1=HurtTypeDoyoon(
+                keyword=data.hurt_type_1.keyword,
+                risk_pct=data.hurt_type_1.risk_pct,
+                desc=data.hurt_type_1.desc,
+            ),
+            hurt_type_2=HurtTypeDoyoon(
+                keyword=data.hurt_type_2.keyword,
+                risk_pct=data.hurt_type_2.risk_pct,
+                desc=data.hurt_type_2.desc,
+            ),
             ai_hurt=hurt["ai_hurt"],
-            hurt_bubble=hurt["bubble"],
-            recovery_timeline=timeline_rows,
-            recovery_accel=accel,
+            meters=[
+                RecoveryMeterDoyoon(label=m.label, pct=m.pct)
+                for m in data.meters
+            ],
             recovery_lag_multiplier=data.recovery_lag_multiplier,
-            ai_recovery=cast(str, recovery_dict["ai_recovery"]),
+            ai_recovery=recovery["ai_recovery"],
+            sd_avatar_asset=data.sd_avatar_asset,
+            recovery_bubble=data.recovery_bubble,
         )
 
     # ── P-1 ──────────────────────────────────────────────────

@@ -1,7 +1,7 @@
-"""도윤 P-2 1-4 약점 트리거 (취약 구간) — 풀 템플릿 합성 + facts 추출.
+"""도윤 P-2 1-4 약점 트리거 — 풀 템플릿 합성 + facts 추출 (원본 도윤 구조).
 
-yeonwoo_p2_hurt와 동일 구조 (시나리오 2 + AI 박스 + 버블) — 톤만 도윤화.
-AI 박스 = 두 시나리오 데이터 분석 + 일간 패턴 진단 + 처방 (300~350자).
+원본 .card-warn × 2 패턴: 짧은 keyword + risk_pct + desc.
+AI 박스 = 두 유형 분석 + 처방 (300~350자).
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ def compose_doyoon_p2_hurt(
     """1-4 약점 트리거 풀 합성.
 
     Returns:
-        scenario_1_when/desc, scenario_2_when/desc, ai_hurt, bubble
+        ai_hurt 텍스트만 (카드 데이터는 facts로 노출).
 
     Raises:
         ValueError / KeyError
@@ -32,25 +32,20 @@ def compose_doyoon_p2_hurt(
         raise KeyError(f"unknown ilgan: {ilgan!r}")
 
     data = DOYOON_P2_DATA[ilgan]
-    s1, s2 = data.scenarios
     ilgan_hanja = ILGAN_HANJA[ilgan]
+    h1, h2 = data.hurt_type_1, data.hurt_type_2
 
     ai_hurt = (
-        f"{user_name}님의 P-2 약점 트리거 분석입니다. "
-        f"{ilgan}({ilgan_hanja}) 일간 표본에서 가장 빈번한 두 유형이 잡혔어요.\n\n"
-        f"첫 번째 — {s1.when}. {s1.desc} 표본 발현률이 {data.vulnerability_pct}이고, "
-        f"동일 패턴 케이스가 전체의 {data.common_pattern_pct}예요.\n\n"
-        f"두 번째 — {s2.when}. {s2.desc}\n\n"
-        f"{data.hurt_optimization}"
+        f"두 유형이 {ilgan}({ilgan_hanja}) 일간 표본에서 가장 자주 나와요. 하나씩 보여드릴게요.\n\n"
+        f"첫 번째는 {h1.keyword}예요. 위험도 {h1.risk_pct}. {h1.desc} "
+        f"{user_name}님 케이스에서 가장 빈번한 변수입니다.\n\n"
+        f"두 번째는 {h2.keyword}예요. 위험도 {h2.risk_pct}. {h2.desc}\n\n"
+        f"둘 다 통제 가능한 영역이에요. 신호 해석 전에 24시간 텀을 두시면 두 패턴 모두 "
+        f"발생률이 {data.intervention_drop_pct} 떨어져요. 조금만 의식해보세요."
     )
 
     return {
-        "scenario_1_when": s1.when,
-        "scenario_1_desc": s1.desc,
-        "scenario_2_when": s2.when,
-        "scenario_2_desc": s2.desc,
         "ai_hurt": ai_hurt,
-        "bubble": data.hurt_bubble,
     }
 
 
@@ -62,14 +57,7 @@ def get_doyoon_p2_hurt_facts(
     user_name: str,
     ilgan: str,
 ) -> dict[str, str]:
-    """P-2 ai_hurt AI prompt에 박을 사실값 + 룰 합성 텍스트.
-
-    Returns:
-        사실값 dict + rule_text.
-
-    Raises:
-        ValueError / KeyError
-    """
+    """P-2 ai_hurt AI prompt facts + 룰 합성 텍스트."""
     if not user_name:
         raise ValueError("doyoon P-2 hurt facts require non-empty user_name")
     if ilgan not in VALID_DOYOON_P2_ILGAN:
@@ -81,10 +69,10 @@ def get_doyoon_p2_hurt_facts(
         "user_name": user_name,
         "ilgan_full": ilgan,
         "ilgan_hanja": ILGAN_HANJA[ilgan],
-        "scenario_1_when": data.scenarios[0].when,
-        "scenario_2_when": data.scenarios[1].when,
-        "vulnerability_pct": data.vulnerability_pct,
-        "common_pattern_pct": data.common_pattern_pct,
-        "hurt_optimization": data.hurt_optimization,
+        "hurt_type_1_keyword": data.hurt_type_1.keyword,
+        "hurt_type_1_risk_pct": data.hurt_type_1.risk_pct,
+        "hurt_type_2_keyword": data.hurt_type_2.keyword,
+        "hurt_type_2_risk_pct": data.hurt_type_2.risk_pct,
+        "intervention_drop_pct": data.intervention_drop_pct,
         "rule_text": composed["ai_hurt"],
     }

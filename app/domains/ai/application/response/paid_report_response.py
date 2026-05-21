@@ -217,25 +217,38 @@ class PaidChapterP2(BaseModel):
     ai_recovery: str
 
 
+class HurtTypeDoyoon(BaseModel):
+    """P-2 약점 카드 — 원본 .card-warn 매핑."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    keyword: str
+    risk_pct: str       # "78%"
+    desc: str
+
+
+class RecoveryMeterDoyoon(BaseModel):
+    """P-2 회복 진행바 — 원본 .meter 매핑. 4단계 고정."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    label: str          # "직후" / "1개월" / "3개월" / "6개월"
+    pct: int            # 0~100 회복률
+
+
 class PaidChapterP2Doyoon(BaseModel):
-    """P-2 도윤 패널 — 약점 트리거 + 회복 곡선 (도윤 톤)."""
+    """P-2 도윤 패널 — 약점 트리거 + 회복 곡선. 원본 도윤_final.html 구조 정합."""
     model_config = ConfigDict(populate_by_name=True)
 
     user_name: str
     # 1-4 약점 트리거
-    scenario_1_when: str
-    scenario_1_desc: str
-    scenario_2_when: str
-    scenario_2_desc: str
-    vulnerability_pct: str
-    common_pattern_pct: str
+    hurt_type_1: HurtTypeDoyoon
+    hurt_type_2: HurtTypeDoyoon
     ai_hurt: str
-    hurt_bubble: str
     # 1-5 회복 곡선
-    recovery_timeline: list[RecoveryTimelineRow]
-    recovery_accel: RecoveryAccel
-    recovery_lag_multiplier: str
+    meters: list[RecoveryMeterDoyoon]     # 4
+    recovery_lag_multiplier: str          # "1.4배"
     ai_recovery: str
+    sd_avatar_asset: str                  # "dy_03" 등
+    recovery_bubble: str                  # 한도윤 SD 옆 멘트
 
 
 # ═════════════════════════════════════════════════════════════════

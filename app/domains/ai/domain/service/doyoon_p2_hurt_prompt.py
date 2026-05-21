@@ -1,6 +1,7 @@
 """도윤 P-2 1-4 약점 트리거 — AI prompt builder + validate.
 
-3단락 300~350자. P-1 패턴 동일.
+원본 도윤 구조 정합 (2026-05-21 재설계).
+4단락 250~400자. 두 hurt_type 분석 + 처방.
 """
 
 from __future__ import annotations
@@ -9,8 +10,8 @@ _SYSTEM_PROMPT = """\
 당신은 도화선 캐릭터 한도윤 — 사주 데이터 분석가.
 
 [페르소나]
-- 존댓말, "{user_name}님" 호명 (단락 1에서 1회)
-- 어휘: 약점, 트리거, 위험 변수, 표본 발현률, 차단율, 케이스, 입력 — P-2 시그니처
+- 존댓말, "{user_name}님" 호명 (단락 2 또는 3에서 1회)
+- 어휘: 약점 유형, 위험도, 표본, 차단율, 케이스, 발생률, 신호 해석 — P-2 시그니처
 - 따뜻함 절제, 숫자 뒤 한 줄 정리
 
 [금지어]
@@ -20,15 +21,17 @@ _SYSTEM_PROMPT = """\
 [사실값 보존 — 절대 변경 금지]
 - 사용자 이름 ({user_name})
 - 일간 한글 + 한자 ({ilgan_full}, {ilgan_hanja})
-- 표본 발현률 ({vulnerability_pct})
-- 동일 패턴 비율 ({common_pattern_pct})
+- 약점 키워드 1 ({hurt_type_1_keyword}) + 위험도 ({hurt_type_1_risk_pct})
+- 약점 키워드 2 ({hurt_type_2_keyword}) + 위험도 ({hurt_type_2_risk_pct})
+- 개입 효과 ({intervention_drop_pct})
 
-[구성] 3 단락, 단락 사이 빈 줄 1개, 총 270~400자
-1. 호명 + 일간 약점 트리거 분석 도입 (1~2문장)
-2. 첫 번째 시나리오 분석 + 표본 발현률 + 동일 패턴 비율 (2~3문장)
-3. 두 번째 시나리오 분석 + 처방 (2~3문장)
+[구성] 4 단락, 단락 사이 빈 줄 1개, 총 230~400자
+1. 두 유형 도입 (1문장)
+2. 첫 번째 유형 분석 + 위험도 (2~3문장)
+3. 두 번째 유형 분석 + 위험도 (1~2문장)
+4. 처방 + 개입 효과 (2문장)
 
-[출력] 3단락 텍스트만. 메타·헤더 금지.
+[출력] 4단락 텍스트만. 메타·헤더 금지.
 """
 
 
@@ -39,22 +42,18 @@ _USER_PROMPT_TPL = """\
 - user_name: {user_name}
 - ilgan_full: {ilgan_full}
 - ilgan_hanja: {ilgan_hanja}
-- vulnerability_pct: {vulnerability_pct}
-- common_pattern_pct: {common_pattern_pct}
-
-[참고 — 두 시나리오]
-1. {scenario_1_when}
-2. {scenario_2_when}
-
-[참고 — 처방]
-{hurt_optimization}
+- hurt_type_1_keyword: {hurt_type_1_keyword}
+- hurt_type_1_risk_pct: {hurt_type_1_risk_pct}
+- hurt_type_2_keyword: {hurt_type_2_keyword}
+- hurt_type_2_risk_pct: {hurt_type_2_risk_pct}
+- intervention_drop_pct: {intervention_drop_pct}
 
 [룰 합성 기반 텍스트 — 기반으로 표현 다양화. 사실값 한 글자도 바꾸지 마세요.]
 
 {rule_text}
 
 [요청]
-위 사실값 모두 포함하는 3단락 270~400자 텍스트를 작성하세요.
+위 사실값 모두 포함하는 4단락 230~400자 텍스트를 작성하세요.
 """
 
 
@@ -62,11 +61,11 @@ _REQUIRED_KEYS = {
     "user_name",
     "ilgan_full",
     "ilgan_hanja",
-    "scenario_1_when",
-    "scenario_2_when",
-    "vulnerability_pct",
-    "common_pattern_pct",
-    "hurt_optimization",
+    "hurt_type_1_keyword",
+    "hurt_type_1_risk_pct",
+    "hurt_type_2_keyword",
+    "hurt_type_2_risk_pct",
+    "intervention_drop_pct",
     "rule_text",
 }
 
@@ -79,14 +78,17 @@ def build_p2_hurt_prompt(facts: dict[str, str]) -> tuple[str, str]:
         user_name=facts["user_name"],
         ilgan_full=facts["ilgan_full"],
         ilgan_hanja=facts["ilgan_hanja"],
-        vulnerability_pct=facts["vulnerability_pct"],
-        common_pattern_pct=facts["common_pattern_pct"],
+        hurt_type_1_keyword=facts["hurt_type_1_keyword"],
+        hurt_type_1_risk_pct=facts["hurt_type_1_risk_pct"],
+        hurt_type_2_keyword=facts["hurt_type_2_keyword"],
+        hurt_type_2_risk_pct=facts["hurt_type_2_risk_pct"],
+        intervention_drop_pct=facts["intervention_drop_pct"],
     )
     user = _USER_PROMPT_TPL.format(**{k: facts[k] for k in _REQUIRED_KEYS})
     return system, user
 
 
-_MIN_LENGTH = 250
+_MIN_LENGTH = 200
 _MAX_LENGTH = 500
 
 
@@ -100,11 +102,17 @@ def validate_p2_hurt(text: str, facts: dict[str, str]) -> tuple[bool, str]:
         return False, f"ilgan_full missing: {facts['ilgan_full']!r}"
     if facts["ilgan_hanja"] not in text:
         return False, f"ilgan_hanja missing: {facts['ilgan_hanja']!r}"
-    if facts["vulnerability_pct"] not in text:
-        return False, f"vulnerability_pct missing: {facts['vulnerability_pct']!r}"
-    if facts["common_pattern_pct"] not in text:
-        return False, f"common_pattern_pct missing: {facts['common_pattern_pct']!r}"
+    if facts["hurt_type_1_keyword"] not in text:
+        return False, f"hurt_type_1_keyword missing: {facts['hurt_type_1_keyword']!r}"
+    if facts["hurt_type_1_risk_pct"] not in text:
+        return False, f"hurt_type_1_risk_pct missing: {facts['hurt_type_1_risk_pct']!r}"
+    if facts["hurt_type_2_keyword"] not in text:
+        return False, f"hurt_type_2_keyword missing: {facts['hurt_type_2_keyword']!r}"
+    if facts["hurt_type_2_risk_pct"] not in text:
+        return False, f"hurt_type_2_risk_pct missing: {facts['hurt_type_2_risk_pct']!r}"
+    if facts["intervention_drop_pct"] not in text:
+        return False, f"intervention_drop_pct missing: {facts['intervention_drop_pct']!r}"
     paragraph_breaks = text.count("\n\n")
-    if paragraph_breaks != 2:
-        return False, f"paragraph structure invalid: {paragraph_breaks} (expected 2)"
+    if paragraph_breaks not in (2, 3):
+        return False, f"paragraph structure invalid: {paragraph_breaks} (expected 2 or 3)"
     return True, ""
