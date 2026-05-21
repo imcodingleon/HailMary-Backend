@@ -94,6 +94,9 @@ from app.domains.payment.adapter.outbound.persistence.payment_repository import 
     PaymentRepository,
 )
 from app.domains.payment.adapter.outbound.saju_hash_resolver import SajuHashResolver
+from app.domains.payment.adapter.outbound.user_demographics_adapter import (
+    UserDemographicsAdapter,
+)
 from app.domains.payment.adapter.outbound.user_lookup_adapter import UserLookupAdapter
 from app.domains.payment.application.usecase.confirm_payment_usecase import (
     ConfirmPaymentUseCase,
@@ -316,6 +319,7 @@ def _make_confirm_payment_usecase(
         saju_result_repo=SajuResultRepository(session),
     )
     user_lookup = UserLookupAdapter(user_repo=user_repo)
+    user_demographics = UserDemographicsAdapter(user_repo=user_repo)
     analytics = AmplitudeAnalyticsAdapter(
         client=AmplitudeClient(
             api_key=_settings.amplitude_api_key,
@@ -330,6 +334,7 @@ def _make_confirm_payment_usecase(
         paid_report_creator=create_paid_report_usecase,
         saju_hash_resolver=saju_hash_resolver,
         analytics=analytics,
+        user_demographics=user_demographics,
     )
 
 

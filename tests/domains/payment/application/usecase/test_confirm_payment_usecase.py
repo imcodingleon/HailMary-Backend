@@ -19,6 +19,7 @@ from app.domains.payment.application.request.confirm_payment_request import (
 )
 from app.domains.payment.application.usecase.confirm_payment_usecase import (
     ConfirmPaymentUseCase,
+    UserDemographicsPort,
     UserLookupPort,
 )
 from app.domains.payment.domain.entity.payment import Payment
@@ -122,6 +123,16 @@ class FakeAnalytics(AnalyticsPort):
         self.calls.append(kwargs)
         if self._raise:
             raise RuntimeError("amplitude down")
+
+
+class FakeUserDemographics(UserDemographicsPort):
+    """가짜 demographics lookup — user_id → gender 매핑을 dict로 흉내낸다."""
+
+    def __init__(self, mapping: dict[int, str | None] | None = None) -> None:
+        self._mapping = mapping if mapping is not None else {42: "female"}
+
+    async def find_gender_by_user_id(self, user_id: int) -> str | None:
+        return self._mapping.get(user_id)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -284,6 +295,7 @@ async def test_analytics_called_with_payment_details_on_success() -> None:
         repo=repo,
         user_lookup=FakeUserLookup(),
         analytics=analytics,
+        user_demographics=FakeUserDemographics(),
     )
 
     response = await usecase.execute(request)
@@ -301,6 +313,7 @@ async def test_analytics_called_with_payment_details_on_success() -> None:
     assert call["character"] == "yeonwoo"
     assert call["method"] == "EASY_PAY"
     assert call["easy_pay_provider"] == "토스페이"
+    assert call["gender"] == "female"
     # PII 금지: customer_email 키가 절대 포함되면 안 됨
     assert "customer_email" not in call
 

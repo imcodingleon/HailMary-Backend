@@ -27,4 +27,5 @@ class AnalyticsPort(Protocol):
         card_issuer_code: str | None,
         bank_code: str | None,
         approved_at: datetime,
+        gender: str | None,
     ) -> None: ...
