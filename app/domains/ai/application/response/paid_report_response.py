@@ -437,6 +437,25 @@ class PaidReportStatusResponse(BaseModel):
     status: str  # "pending" | "ready" | "expired"
 
 
+class PaidUserPropertiesResponse(BaseModel):
+    """Amplitude `identify()` 전용 PII 가공 user property.
+
+    원본 이름·이메일·생년월일·태어난 시각은 절대 포함하지 않는다.
+    프론트 `usePaidUserPropertiesSync`가 p0 진입 시 1회 set.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_id: str
+    user_nickname: str | None = None
+    user_name_initial: str
+    user_email_domain: str
+    user_email_hash: str
+    birth_year: int
+    age_group: str
+    birth_branch: str | None = None
+    gender: str
+
+
 class PaidReportResponse(BaseModel):
     """`GET /api/saju/paid/{order_id}` 응답 — 12 페이지 결과."""
     model_config = ConfigDict(populate_by_name=True)
@@ -445,3 +464,4 @@ class PaidReportResponse(BaseModel):
     status: str
     chapters: PaidChaptersResponse  # ← dict[str, str]에서 명시 타입으로 변경
     expires_at: datetime
+    user: PaidUserPropertiesResponse | None = None

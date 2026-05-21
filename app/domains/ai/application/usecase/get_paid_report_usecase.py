@@ -9,6 +9,8 @@ from app.domains.payment.domain.entity.payment import Payment
 from app.domains.payment.domain.port.payment_repository_port import (
     PaymentRepositoryPort,
 )
+from app.domains.user.domain.entity.user import User
+from app.domains.user.domain.port.user_repository_port import UserRepositoryPort
 
 
 class PaidReportNotFoundError(Exception):
@@ -20,9 +22,10 @@ class PaidReportExpiredError(Exception):
 
 
 class GetPaidReportUseCase:
-    """결제 만료 체크 + 결과 조회.
+    """결제 만료 체크 + 결과 조회 + 분석용 user 동봉.
 
     만료 정책: ai 도메인은 expires_at을 갖지 않는다. Payment.expires_at이 SSOT.
+    User 조회 실패는 결과지 응답을 막지 않음 (분석 메타에 그치므로 None 허용).
     """
 
     def __init__(
@@ -30,25 +33,31 @@ class GetPaidReportUseCase:
         *,
         paid_report_repo: PaidReportRepositoryPort,
         payment_repo: PaymentRepositoryPort,
+        user_repo: UserRepositoryPort,
     ) -> None:
         self._paid_report_repo = paid_report_repo
         self._payment_repo = payment_repo
+        self._user_repo = user_repo
 
-    async def execute(self, order_id: str) -> tuple[PaidReport, Payment]:
+    async def execute(self, order_id: str) -> tuple[PaidReport, Payment, User | None]:
         report = await self._paid_report_repo.find_by_order_id(order_id)
         if report is None:
             raise PaidReportNotFoundError(order_id)
         return await self._verify_and_return(report)
 
-    async def execute_by_share_code(self, share_code: str) -> tuple[PaidReport, Payment]:
+    async def execute_by_share_code(
+        self, share_code: str
+    ) -> tuple[PaidReport, Payment, User | None]:
         """share_code(UUID4 hex)로 PaidReport 조회 — 이메일 재접속 링크 진입점."""
         report = await self._paid_report_repo.find_by_share_code(share_code)
         if report is None:
             raise PaidReportNotFoundError(share_code)
         return await self._verify_and_return(report)
 
-    async def _verify_and_return(self, report: PaidReport) -> tuple[PaidReport, Payment]:
-        """Payment 존재 + expires_at 체크 후 반환. 만료 시 EXPIRED 예외."""
+    async def _verify_and_return(
+        self, report: PaidReport
+    ) -> tuple[PaidReport, Payment, User | None]:
+        """Payment 존재 + expires_at 체크 후 (report, payment, user) 반환."""
         payment = await self._payment_repo.find_by_order_id(report.order_id)
         if payment is None:
             raise PaidReportNotFoundError(report.order_id)
@@ -64,4 +73,5 @@ class GetPaidReportUseCase:
             report.status = ReportStatus.EXPIRED
             raise PaidReportExpiredError(report.order_id)
 
-        return report, payment
+        user = await self._user_repo.find_by_id(payment.user_id)
+        return report, payment, user
