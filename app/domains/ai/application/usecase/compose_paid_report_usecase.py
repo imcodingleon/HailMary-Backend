@@ -40,6 +40,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP2,
     PaidChapterP2Doyoon,
     PaidChapterP3,
+    PaidChapterP3Doyoon,
     PaidChapterP4,
     PaidChapterP5,
     PaidChapterP6,
@@ -61,6 +62,10 @@ from app.domains.ai.domain.templates.doyoon_p1_opening import compose_doyoon_p1_
 from app.domains.ai.domain.templates.doyoon_p1_trigger import compose_doyoon_p1_trigger
 from app.domains.ai.domain.templates.doyoon_p2_hurt import compose_doyoon_p2_hurt
 from app.domains.ai.domain.templates.doyoon_p2_recovery import compose_doyoon_p2_recovery
+from app.domains.ai.domain.templates.doyoon_p3_blocking import (
+    compose_doyoon_p3_blockade,
+    compose_doyoon_p3_pattern,
+)
 from app.domains.ai.domain.templates.yeonwoo_p0_intro import compose_p0_intro
 from app.domains.ai.domain.templates.yeonwoo_p1_chapter_opening import (
     compose_p1_chapter_opening,
@@ -231,23 +236,29 @@ class ComposePaidReportUseCase:
         p6 = self._build_p6(ilgan, match_slot_id, ohang_lack)
         p8 = self._build_p8(saju_raw, ilgan, start_year, start_month)
 
-        # 도윤 P-0, P-1, P-2는 별도 chapters key. 다른 페이지는 점진 추가 예정.
+        # 도윤 P-0~P-3는 별도 chapters key. 다른 페이지는 점진 추가 예정.
         if character == "doyoon":
             p0_doyoon = self._build_p0_doyoon(
                 vars_, ilgan, ohang_excess, ohang_lack, user_name or ""
             )
             p1_doyoon = self._build_p1_doyoon(ilgan, ilju, user_name or "")
             p2_doyoon = self._build_p2_doyoon(ilgan, user_name or "")
+            p3_doyoon = self._build_p3_doyoon(
+                ilgan, ohang_excess, user_name or ""
+            )
             p0_yeonwoo = None
             p1_yeonwoo = None
             p2_yeonwoo = None
+            p3_yeonwoo = None
         else:
             p0_doyoon = None
             p1_doyoon = None
             p2_doyoon = None
+            p3_doyoon = None
             p0_yeonwoo = self._build_p0(vars_, ilgan, ohang_excess, ohang_lack)
             p1_yeonwoo = self._build_p1(ilgan, ilju)
             p2_yeonwoo = self._build_p2(ilgan)
+            p3_yeonwoo = self._build_p3(ilgan, ohang_excess)
 
         return PaidChaptersResponse(
             p0=p0_yeonwoo,
@@ -256,7 +267,8 @@ class ComposePaidReportUseCase:
             p1_doyoon=p1_doyoon,
             p2=p2_yeonwoo,
             p2_doyoon=p2_doyoon,
-            p3=self._build_p3(ilgan, ohang_excess),
+            p3=p3_yeonwoo,
+            p3_doyoon=p3_doyoon,
             p4=self._build_p4(ilgan, akyon_slot_id, ohang_excess),
             p5=self._build_p5(ilgan, charm, sal_keys),
             p6=p6,
@@ -411,6 +423,65 @@ class ComposePaidReportUseCase:
                 user_name=user_name, ilgan=ilgan
             ),
             bubble_quote="이거 알고 계신 것만으로도 달라져요. 진짜로요.",
+        )
+
+    # ── P-3 (도윤 패널) ──────────────────────────────────────
+    def _build_p3_doyoon(
+        self, ilgan: str, ohang_excess: str, user_name: str
+    ) -> PaidChapterP3Doyoon | None:
+        """도윤 P-3 합성 — 구조적 원인 + 반복 패턴 + 변수 통제.
+
+        ilgan/ohang_excess unknown 시 None (graceful).
+        """
+        try:
+            from app.domains.ai.application.response.paid_report_response import (
+                BlockadeOhangP3Doyoon,
+                ControlStrategyDoyoon,
+                PatternEntryDoyoon,
+            )
+            from app.domains.ai.domain.value_object.doyoon_p3_data import (
+                BLOCKADE_BY_OHANG,
+                DOYOON_P3_DATA,
+                P3_SD_ASSET,
+            )
+
+            ai_blockade = compose_doyoon_p3_blockade(
+                user_name=user_name, ilgan=ilgan, ohang_excess=ohang_excess
+            )
+            ai_pattern = compose_doyoon_p3_pattern(
+                user_name=user_name, ilgan=ilgan
+            )
+            b = BLOCKADE_BY_OHANG[ohang_excess]
+            d = DOYOON_P3_DATA[ilgan]
+        except (KeyError, ValueError):
+            return None
+
+        return PaidChapterP3Doyoon(
+            user_name=user_name,
+            blockade=BlockadeOhangP3Doyoon(
+                ohang_excess=ohang_excess,
+                ohang_excess_hanja=b.ohang_hanja,
+                blockade_pct=b.blockade_pct,
+                blockade_multiplier=b.blockade_multiplier,
+            ),
+            ai_blockade=ai_blockade,
+            blockade_bubble=d.blockade_bubble
+                .replace("{USER_NAME}", user_name)
+                .replace("{OHANG_EXCESS}", f"{ohang_excess}({b.ohang_hanja})"),
+            patterns=[
+                PatternEntryDoyoon(keyword=p.keyword, pct=p.pct, desc=p.desc)
+                for p in d.patterns
+            ],
+            ai_pattern=ai_pattern,
+            pattern_bubble=d.pattern_bubble,
+            strategies=[
+                ControlStrategyDoyoon(
+                    keyword=s.keyword, desc=s.desc, effect_pct=s.effect_pct
+                )
+                for s in d.strategies
+            ],
+            strategy_bubble=d.strategy_bubble,
+            sd_avatar_asset=P3_SD_ASSET,
         )
 
     # ── P-2 (도윤 패널) ──────────────────────────────────────

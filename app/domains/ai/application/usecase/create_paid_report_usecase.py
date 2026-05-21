@@ -53,6 +53,12 @@ if TYPE_CHECKING:
     from app.domains.ai.application.usecase.generate_p2_recovery_usecase import (
         GenerateP2RecoveryUseCase,
     )
+    from app.domains.ai.application.usecase.generate_p3_blockade_usecase import (
+        GenerateP3BlockadeUseCase,
+    )
+    from app.domains.ai.application.usecase.generate_p3_pattern_usecase import (
+        GenerateP3PatternUseCase,
+    )
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
     )
@@ -123,6 +129,8 @@ class CreatePaidReportUseCase:
         p1_emotion_usecase: GenerateP1EmotionUseCase | None = None,
         p2_hurt_usecase: GenerateP2HurtUseCase | None = None,
         p2_recovery_usecase: GenerateP2RecoveryUseCase | None = None,
+        p3_blockade_usecase: GenerateP3BlockadeUseCase | None = None,
+        p3_pattern_usecase: GenerateP3PatternUseCase | None = None,
         email_sender: SendResultLinkEmailUseCase | None = None,
         user_repo: UserRepository | None = None,
     ) -> None:
@@ -137,6 +145,8 @@ class CreatePaidReportUseCase:
         self._p1_emotion_usecase = p1_emotion_usecase
         self._p2_hurt_usecase = p2_hurt_usecase
         self._p2_recovery_usecase = p2_recovery_usecase
+        self._p3_blockade_usecase = p3_blockade_usecase
+        self._p3_pattern_usecase = p3_pattern_usecase
         self._email_sender = email_sender
         self._user_repo = user_repo
 
@@ -419,6 +429,29 @@ class CreatePaidReportUseCase:
                 self._p2_recovery_usecase.execute(user_name=user_name, ilgan=ilgan),
             ))
 
+        # P-3 ai_blockade (ohang_excess 필요)
+        if (
+            self._p3_blockade_usecase is not None
+            and response.p3_doyoon is not None
+            and excess
+        ):
+            tasks.append((
+                "p3_blockade",
+                self._p3_blockade_usecase.execute(
+                    user_name=user_name, ilgan=ilgan, ohang_excess=excess
+                ),
+            ))
+
+        # P-3 ai_pattern
+        if (
+            self._p3_pattern_usecase is not None
+            and response.p3_doyoon is not None
+        ):
+            tasks.append((
+                "p3_pattern",
+                self._p3_pattern_usecase.execute(user_name=user_name, ilgan=ilgan),
+            ))
+
         if not tasks:
             return
 
@@ -446,3 +479,7 @@ class CreatePaidReportUseCase:
                 response.p2_doyoon.ai_hurt = ai_text
             elif name == "p2_recovery" and response.p2_doyoon is not None:
                 response.p2_doyoon.ai_recovery = ai_text
+            elif name == "p3_blockade" and response.p3_doyoon is not None:
+                response.p3_doyoon.ai_blockade = ai_text
+            elif name == "p3_pattern" and response.p3_doyoon is not None:
+                response.p3_doyoon.ai_pattern = ai_text

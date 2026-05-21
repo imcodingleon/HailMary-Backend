@@ -277,6 +277,58 @@ class PaidChapterP3(BaseModel):
 
 
 # ═════════════════════════════════════════════════════════════════
+# P-3 도윤 패널 — 二 연애를 막는 것 (1/2)
+# ═════════════════════════════════════════════════════════════════
+
+
+class BlockadeOhangP3Doyoon(BaseModel):
+    """2-1 구조적 원인 — 큰 card-warn 1."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    ohang_excess: str          # "수"
+    ohang_excess_hanja: str    # "水"
+    blockade_pct: str          # "상위 15%"
+    blockade_multiplier: str   # "1.7배"
+
+
+class PatternEntryDoyoon(BaseModel):
+    """2-2 반복 패턴 card-warn 1개."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    keyword: str
+    pct: str
+    desc: str
+
+
+class ControlStrategyDoyoon(BaseModel):
+    """2-2-1 변수 통제 card-good 1개."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    keyword: str
+    desc: str
+    effect_pct: str
+
+
+class PaidChapterP3Doyoon(BaseModel):
+    """P-3 도윤 패널 — 구조적 원인 + 반복 패턴 + 변수 통제."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_name: str
+    # 2-1 구조적 원인
+    blockade: BlockadeOhangP3Doyoon
+    ai_blockade: str
+    blockade_bubble: str
+    # 2-2 반복 패턴
+    patterns: list[PatternEntryDoyoon]    # 3
+    ai_pattern: str
+    pattern_bubble: str
+    # 2-2-1 변수 통제
+    strategies: list[ControlStrategyDoyoon]   # 2
+    strategy_bubble: str
+    sd_avatar_asset: str                  # "dy_10" 고정
+
+
+# ═════════════════════════════════════════════════════════════════
 # P-4 二 연애를 막는 것 (2/2)
 # ═════════════════════════════════════════════════════════════════
 
@@ -530,6 +582,7 @@ class PaidChaptersResponse(BaseModel):
     p2: PaidChapterP2 | None = None
     p2_doyoon: PaidChapterP2Doyoon | None = None
     p3: PaidChapterP3 | None = None
+    p3_doyoon: PaidChapterP3Doyoon | None = None
     p4: PaidChapterP4 | None = None
     p5: PaidChapterP5 | None = None
     p6: PaidChapterP6 | None = None
