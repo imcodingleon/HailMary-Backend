@@ -36,10 +36,11 @@ class ClaudeClient(AIClientPort):
         user_prompt: str,
         max_tokens: int = 1024,
         temperature: float = 0.85,
+        model: str | None = None,
     ) -> str:
         try:
             message = await self._client.messages.create(
-                model=self._model,
+                model=model or self._model,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 system=system_prompt,

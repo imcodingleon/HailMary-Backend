@@ -35,6 +35,9 @@ from app.domains.ai.domain.value_object.character_persona import (
 from app.domains.ai.domain.value_object.report_status import ReportStatus
 
 if TYPE_CHECKING:
+    from app.domains.ai.application.usecase.generate_p0_diagnosis_usecase import (
+        GenerateP0DiagnosisUseCase,
+    )
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
     )
@@ -99,6 +102,7 @@ class CreatePaidReportUseCase:
         survey_repo: SurveyRepository | None = None,
         compose_usecase: ComposePaidReportUseCase | None = None,
         p10_letter_usecase: GenerateP10LetterUseCase | None = None,
+        p0_diagnosis_usecase: GenerateP0DiagnosisUseCase | None = None,
         email_sender: SendResultLinkEmailUseCase | None = None,
         user_repo: UserRepository | None = None,
     ) -> None:
@@ -107,6 +111,7 @@ class CreatePaidReportUseCase:
         self._survey_repo = survey_repo
         self._compose_usecase = compose_usecase
         self._p10_letter_usecase = p10_letter_usecase
+        self._p0_diagnosis_usecase = p0_diagnosis_usecase
         self._email_sender = email_sender
         self._user_repo = user_repo
 
@@ -234,6 +239,32 @@ class CreatePaidReportUseCase:
             character=character or "yeonwoo",
             user_name=user_name_for_compose,
         )
+
+        # 1.5차 — 도윤 P-0 ai_intro AI 갱신 (실패 시 룰 유지)
+        if (
+            character == "doyoon"
+            and self._p0_diagnosis_usecase is not None
+            and response.p0_doyoon is not None
+            and user_name_for_compose
+        ):
+            vars_p0 = self._compose_usecase._extractor.extract_paid_variables(saju_raw)
+            ilgan_p0 = vars_p0.get("ILGAN", "")
+            excess_p0 = vars_p0.get("OHANG_EXCESS", "")
+            lack_p0 = vars_p0.get("OHANG_LACK", "")
+            if ilgan_p0 and excess_p0 and lack_p0:
+                try:
+                    ai_intro = await self._p0_diagnosis_usecase.execute(
+                        user_name=user_name_for_compose,
+                        ilgan=ilgan_p0,
+                        ohang_excess=excess_p0,
+                        ohang_lack=lack_p0,
+                    )
+                    response.p0_doyoon.ai_intro = ai_intro
+                except Exception:
+                    logger.exception(
+                        "doyoon P-0 ai_intro generation failed for user_id=%s", user_id
+                    )
+                    # 룰 fallback 그대로 유지 (compose가 이미 룰로 채움)
 
         # 2차 — step3 있고 AI 가능하면 AI 답장 → 박스 3 갱신
         if (

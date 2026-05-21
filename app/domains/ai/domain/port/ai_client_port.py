@@ -24,4 +24,11 @@ class AIClientPort(ABC):
         user_prompt: str,
         max_tokens: int = 1024,
         temperature: float = 0.85,
-    ) -> str: ...
+        model: str | None = None,
+    ) -> str:
+        """model=None이면 클라이언트 기본 모델 (settings.claude_model).
+
+        모델 override는 짧은/저비용 박스에 haiku를 명시 지정할 때 사용
+        (예: P-0 ai_intro = haiku 4.5).
+        """
+        ...

@@ -23,6 +23,9 @@ from app.domains.ai.application.usecase.compose_paid_report_usecase import (
 from app.domains.ai.application.usecase.create_paid_report_usecase import (
     CreatePaidReportUseCase,
 )
+from app.domains.ai.application.usecase.generate_p0_diagnosis_usecase import (
+    GenerateP0DiagnosisUseCase,
+)
 from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
     GenerateP10LetterUseCase,
 )
@@ -179,12 +182,15 @@ def _make_confirm_payment_usecase(
     paid_report_repo = PaidReportRepository(session)
     # P-10 AI 호출용 Claude 클라이언트 (키 있을 때만, 없으면 폴백)
     p10_letter_usecase: GenerateP10LetterUseCase | None = None
+    # 도윤 P-0 ai_intro AI 호출 (haiku, 같은 클라이언트 공유 — model override)
+    p0_diagnosis_usecase: GenerateP0DiagnosisUseCase | None = None
     if _settings.claude_api_key:
         claude_client = ClaudeClient(
             api_key=_settings.claude_api_key,
             model=_settings.claude_model,
         )
         p10_letter_usecase = GenerateP10LetterUseCase(ai_client=claude_client)
+        p0_diagnosis_usecase = GenerateP0DiagnosisUseCase(ai_client=claude_client)
     # SES 이메일 발송 (sender + IAM 키 있을 때만, 없으면 폴백)
     email_sender: SendResultLinkEmailUseCase | None = None
     if _settings.aws_ses_sender:
@@ -211,6 +217,7 @@ def _make_confirm_payment_usecase(
         survey_repo=SurveyRepository(session),
         compose_usecase=ComposePaidReportUseCase(),
         p10_letter_usecase=p10_letter_usecase,
+        p0_diagnosis_usecase=p0_diagnosis_usecase,
         email_sender=email_sender,
         user_repo=user_repo,
     )
