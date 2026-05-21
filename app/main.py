@@ -26,6 +26,15 @@ from app.domains.ai.application.usecase.create_paid_report_usecase import (
 from app.domains.ai.application.usecase.generate_p0_diagnosis_usecase import (
     GenerateP0DiagnosisUseCase,
 )
+from app.domains.ai.application.usecase.generate_p1_emotion_usecase import (
+    GenerateP1EmotionUseCase,
+)
+from app.domains.ai.application.usecase.generate_p1_opening_usecase import (
+    GenerateP1OpeningUseCase,
+)
+from app.domains.ai.application.usecase.generate_p1_trigger_usecase import (
+    GenerateP1TriggerUseCase,
+)
 from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
     GenerateP10LetterUseCase,
 )
@@ -182,8 +191,11 @@ def _make_confirm_payment_usecase(
     paid_report_repo = PaidReportRepository(session)
     # P-10 AI 호출용 Claude 클라이언트 (키 있을 때만, 없으면 폴백)
     p10_letter_usecase: GenerateP10LetterUseCase | None = None
-    # 도윤 P-0 ai_intro AI 호출 (haiku, 같은 클라이언트 공유 — model override)
+    # 도윤 P-0 ai_intro + P-1 3슬롯 AI (같은 클라이언트 공유, model은 sonnet 통일)
     p0_diagnosis_usecase: GenerateP0DiagnosisUseCase | None = None
+    p1_opening_usecase: GenerateP1OpeningUseCase | None = None
+    p1_trigger_usecase: GenerateP1TriggerUseCase | None = None
+    p1_emotion_usecase: GenerateP1EmotionUseCase | None = None
     if _settings.claude_api_key:
         claude_client = ClaudeClient(
             api_key=_settings.claude_api_key,
@@ -191,6 +203,9 @@ def _make_confirm_payment_usecase(
         )
         p10_letter_usecase = GenerateP10LetterUseCase(ai_client=claude_client)
         p0_diagnosis_usecase = GenerateP0DiagnosisUseCase(ai_client=claude_client)
+        p1_opening_usecase = GenerateP1OpeningUseCase(ai_client=claude_client)
+        p1_trigger_usecase = GenerateP1TriggerUseCase(ai_client=claude_client)
+        p1_emotion_usecase = GenerateP1EmotionUseCase(ai_client=claude_client)
     # SES 이메일 발송 (sender + IAM 키 있을 때만, 없으면 폴백)
     email_sender: SendResultLinkEmailUseCase | None = None
     if _settings.aws_ses_sender:
@@ -218,6 +233,9 @@ def _make_confirm_payment_usecase(
         compose_usecase=ComposePaidReportUseCase(),
         p10_letter_usecase=p10_letter_usecase,
         p0_diagnosis_usecase=p0_diagnosis_usecase,
+        p1_opening_usecase=p1_opening_usecase,
+        p1_trigger_usecase=p1_trigger_usecase,
+        p1_emotion_usecase=p1_emotion_usecase,
         email_sender=email_sender,
         user_repo=user_repo,
     )

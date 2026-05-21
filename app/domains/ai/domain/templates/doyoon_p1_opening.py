@@ -12,6 +12,7 @@ HTML 도윤_final.html line 1992~1999 임수 더미 톤 미러:
 
 from __future__ import annotations
 
+from app.domains.ai.domain.templates.doyoon_p0_intro import ILGAN_HANJA
 from app.domains.ai.domain.value_object.doyoon_p1_data import (
     DOYOON_P1_DATA,
     VALID_DOYOON_P1_ILGAN,
@@ -151,3 +152,50 @@ def compose_doyoon_p1_opening(
     para4 = ILGAN_OPTIMIZATION[ilgan].replace("{USER_NAME}", user_name)
 
     return "\n\n".join([para1, para2, para3, para4])
+
+
+# ── AI prompt + 검증용 facts 추출 ────────────────────────────────
+
+
+def get_doyoon_p1_opening_facts(
+    *,
+    user_name: str,
+    ilgan: str,
+    ilju_hanja: str,
+) -> dict[str, str]:
+    """P-1 ai_opening AI prompt에 박을 사실값 + 룰 합성 텍스트.
+
+    Args:
+        user_name: 사용자 이름 (호명)
+        ilgan: 일간 한글 (예: "임수")
+        ilju_hanja: 한자 표기 일주 (예: "임술(壬戌)") — application layer가 미리 변환
+
+    Returns:
+        사실값 dict + rule_text. AI가 모두 보존해야 함.
+
+    Raises:
+        ValueError / KeyError: 입력 가드 실패.
+    """
+    if not user_name:
+        raise ValueError("doyoon P-1 opening facts require non-empty user_name")
+    if ilgan not in VALID_DOYOON_P1_ILGAN:
+        raise KeyError(f"unknown ilgan: {ilgan!r}")
+
+    data = DOYOON_P1_DATA[ilgan]
+    rule_text = compose_doyoon_p1_opening(
+        user_name=user_name, ilgan=ilgan, ilju=ilju_hanja
+    )
+    return {
+        "user_name": user_name,
+        "ilgan_full": ilgan,
+        "ilgan_hanja": ILGAN_HANJA[ilgan],
+        "ilju_hanja": ilju_hanja,
+        "love_type": data.love_type,
+        "pct_value": f"{data.pct_value}%",
+        "distribution_pct": f"{data.distribution_pct}%",
+        "ilgan_diagnosis_text": ILGAN_DIAGNOSIS[ilgan],
+        "ilgan_optimization_text": ILGAN_OPTIMIZATION[ilgan].replace(
+            "{USER_NAME}", user_name
+        ),
+        "rule_text": rule_text,
+    }

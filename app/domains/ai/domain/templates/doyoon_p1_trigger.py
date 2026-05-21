@@ -60,3 +60,46 @@ def compose_doyoon_p1_trigger(
     )
 
     return "\n\n".join([para1, para2])
+
+
+# ── AI prompt + 검증용 facts 추출 ────────────────────────────────
+
+
+# 트리거 발화 임계점 + 위기 진입 시간 — 일간 무관 고정 표기.
+TRIGGER_COMPLETION_PCT = "88%"
+PEAK_WINDOW_DAYS = "30일"
+
+
+def get_doyoon_p1_trigger_facts(
+    *,
+    user_name: str,
+    ilgan: str,
+) -> dict[str, str]:
+    """P-1 ai_trigger AI prompt에 박을 사실값 + 룰 합성 텍스트.
+
+    Returns:
+        사실값 dict + rule_text. AI가 모두 보존해야 함.
+        검증 핵심: user_name, ilgan, trigger_1/2, 88%, 30일, self_control_pct.
+
+    Raises:
+        ValueError / KeyError: 입력 가드 실패.
+    """
+    if not user_name:
+        raise ValueError("doyoon P-1 trigger facts require non-empty user_name")
+    if ilgan not in VALID_DOYOON_P1_ILGAN:
+        raise KeyError(f"unknown ilgan: {ilgan!r}")
+
+    data = DOYOON_P1_DATA[ilgan]
+    rule_text = compose_doyoon_p1_trigger(user_name=user_name, ilgan=ilgan)
+    return {
+        "user_name": user_name,
+        "ilgan_full": ilgan,
+        "trigger_1": data.trigger_1,
+        "trigger_2": data.trigger_2,
+        "trigger_3": data.trigger_3,
+        "trigger_completion_pct": TRIGGER_COMPLETION_PCT,
+        "peak_window_days": PEAK_WINDOW_DAYS,
+        "self_control_pct": f"{data.self_control_pct}%",
+        "control_reason_text": ILGAN_CONTROL_REASON[ilgan],
+        "rule_text": rule_text,
+    }

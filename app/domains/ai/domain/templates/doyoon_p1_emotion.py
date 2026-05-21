@@ -94,3 +94,40 @@ def compose_doyoon_p1_emotion(
     )
 
     return "\n\n".join([para1, para2, para3])
+
+
+# ── AI prompt + 검증용 facts 추출 ────────────────────────────────
+
+
+def get_doyoon_p1_emotion_facts(
+    *,
+    user_name: str,
+    ilgan: str,
+) -> dict[str, str]:
+    """P-1 ai_emotion AI prompt에 박을 사실값 + 룰 합성 텍스트.
+
+    Returns:
+        사실값 dict + rule_text. AI가 모두 보존해야 함.
+        검증 핵심: ilgan, crisis_pct, recovery_pct, crisis_multiplier, expression_effect_pct.
+        user_name은 본 박스 룰에 안 들어가서 검증 생략 (선택적 포함).
+
+    Raises:
+        ValueError / KeyError: 입력 가드 실패.
+    """
+    if not user_name:
+        raise ValueError("doyoon P-1 emotion facts require non-empty user_name")
+    if ilgan not in VALID_DOYOON_P1_ILGAN:
+        raise KeyError(f"unknown ilgan: {ilgan!r}")
+
+    data = DOYOON_P1_DATA[ilgan]
+    rule_text = compose_doyoon_p1_emotion(user_name=user_name, ilgan=ilgan)
+    return {
+        "user_name": user_name,
+        "ilgan_full": ilgan,
+        "crisis_pct": f"{data.emotion_curve[2]}%",
+        "recovery_pct": f"{data.emotion_curve[3]}%",
+        "crisis_multiplier": data.crisis_multiplier,
+        "expression_effect_pct": f"{data.expression_effect_pct}%",
+        "curve_diag_text": ILGAN_CURVE_DIAG[ilgan].replace("{ILGAN}", ilgan),
+        "rule_text": rule_text,
+    }
