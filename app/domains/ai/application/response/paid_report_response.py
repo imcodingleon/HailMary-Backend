@@ -371,6 +371,48 @@ class PaidChapterP4(BaseModel):
 
 
 # ═════════════════════════════════════════════════════════════════
+# P-4 도윤 패널 — 二 연애를 막는 것 (2/2)
+# ═════════════════════════════════════════════════════════════════
+
+
+class AkyonInfoRowDoyoon(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    key: str
+    val: str
+
+
+class IllusionSignDoyoon(BaseModel):
+    """2-4 오인 신호 card-warn 1개."""
+    model_config = ConfigDict(populate_by_name=True)
+    keyword: str
+    pct: str
+    desc: str
+
+
+class PaidChapterP4Doyoon(BaseModel):
+    """P-4 도윤 패널 — 비호환 유형 + 착각 인연."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_name: str
+    # 2-3 비호환
+    akyon_slot_id: str
+    keyword_tags: list[str]              # 5
+    info_rows: list[AkyonInfoRowDoyoon]  # 10
+    ai_akyon: str
+    sd_avatar_asset: str                  # "dy_08"
+    akyon_bubble: str
+    # 2-4 착각 인연
+    illusion_signs: list[IllusionSignDoyoon]   # 3
+    ai_illusion: str
+    illusion_bubble: str
+    # 결정 분기점 (모든 일간 공통)
+    decisive_gradient_label: str
+    real_growth_pct: str
+    fake_drop_pct: str
+    accuracy_multiplier: str
+
+
+# ═════════════════════════════════════════════════════════════════
 # P-5 三 매력 분석
 # ═════════════════════════════════════════════════════════════════
 
@@ -584,6 +626,7 @@ class PaidChaptersResponse(BaseModel):
     p3: PaidChapterP3 | None = None
     p3_doyoon: PaidChapterP3Doyoon | None = None
     p4: PaidChapterP4 | None = None
+    p4_doyoon: PaidChapterP4Doyoon | None = None
     p5: PaidChapterP5 | None = None
     p6: PaidChapterP6 | None = None
     p7: PaidChapterP7 | None = None

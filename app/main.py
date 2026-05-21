@@ -47,6 +47,12 @@ from app.domains.ai.application.usecase.generate_p3_blockade_usecase import (
 from app.domains.ai.application.usecase.generate_p3_pattern_usecase import (
     GenerateP3PatternUseCase,
 )
+from app.domains.ai.application.usecase.generate_p4_akyon_usecase import (
+    GenerateP4AkyonUseCase,
+)
+from app.domains.ai.application.usecase.generate_p4_illusion_usecase import (
+    GenerateP4IllusionUseCase,
+)
 from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
     GenerateP10LetterUseCase,
 )
@@ -212,6 +218,8 @@ def _make_confirm_payment_usecase(
     p2_recovery_usecase: GenerateP2RecoveryUseCase | None = None
     p3_blockade_usecase: GenerateP3BlockadeUseCase | None = None
     p3_pattern_usecase: GenerateP3PatternUseCase | None = None
+    p4_akyon_usecase: GenerateP4AkyonUseCase | None = None
+    p4_illusion_usecase: GenerateP4IllusionUseCase | None = None
     if _settings.claude_api_key:
         claude_client = ClaudeClient(
             api_key=_settings.claude_api_key,
@@ -226,6 +234,8 @@ def _make_confirm_payment_usecase(
         p2_recovery_usecase = GenerateP2RecoveryUseCase(ai_client=claude_client)
         p3_blockade_usecase = GenerateP3BlockadeUseCase(ai_client=claude_client)
         p3_pattern_usecase = GenerateP3PatternUseCase(ai_client=claude_client)
+        p4_akyon_usecase = GenerateP4AkyonUseCase(ai_client=claude_client)
+        p4_illusion_usecase = GenerateP4IllusionUseCase(ai_client=claude_client)
     # SES 이메일 발송 (sender + IAM 키 있을 때만, 없으면 폴백)
     email_sender: SendResultLinkEmailUseCase | None = None
     if _settings.aws_ses_sender:
@@ -260,6 +270,8 @@ def _make_confirm_payment_usecase(
         p2_recovery_usecase=p2_recovery_usecase,
         p3_blockade_usecase=p3_blockade_usecase,
         p3_pattern_usecase=p3_pattern_usecase,
+        p4_akyon_usecase=p4_akyon_usecase,
+        p4_illusion_usecase=p4_illusion_usecase,
         email_sender=email_sender,
         user_repo=user_repo,
     )

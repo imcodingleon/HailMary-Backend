@@ -41,6 +41,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP2Doyoon,
     PaidChapterP3,
     PaidChapterP3Doyoon,
+    PaidChapterP4Doyoon,
     PaidChapterP4,
     PaidChapterP5,
     PaidChapterP6,
@@ -65,6 +66,10 @@ from app.domains.ai.domain.templates.doyoon_p2_recovery import compose_doyoon_p2
 from app.domains.ai.domain.templates.doyoon_p3_blocking import (
     compose_doyoon_p3_blockade,
     compose_doyoon_p3_pattern,
+)
+from app.domains.ai.domain.templates.doyoon_p4_blocking2 import (
+    compose_doyoon_p4_akyon,
+    compose_doyoon_p4_illusion,
 )
 from app.domains.ai.domain.templates.yeonwoo_p0_intro import compose_p0_intro
 from app.domains.ai.domain.templates.yeonwoo_p1_chapter_opening import (
@@ -246,19 +251,25 @@ class ComposePaidReportUseCase:
             p3_doyoon = self._build_p3_doyoon(
                 ilgan, ohang_excess, user_name or ""
             )
+            p4_doyoon = self._build_p4_doyoon(
+                ilgan, akyon_slot_id, user_name or ""
+            )
             p0_yeonwoo = None
             p1_yeonwoo = None
             p2_yeonwoo = None
             p3_yeonwoo = None
+            p4_yeonwoo = None
         else:
             p0_doyoon = None
             p1_doyoon = None
             p2_doyoon = None
             p3_doyoon = None
+            p4_doyoon = None
             p0_yeonwoo = self._build_p0(vars_, ilgan, ohang_excess, ohang_lack)
             p1_yeonwoo = self._build_p1(ilgan, ilju)
             p2_yeonwoo = self._build_p2(ilgan)
             p3_yeonwoo = self._build_p3(ilgan, ohang_excess)
+            p4_yeonwoo = self._build_p4(ilgan, akyon_slot_id, ohang_excess)
 
         return PaidChaptersResponse(
             p0=p0_yeonwoo,
@@ -269,7 +280,8 @@ class ComposePaidReportUseCase:
             p2_doyoon=p2_doyoon,
             p3=p3_yeonwoo,
             p3_doyoon=p3_doyoon,
-            p4=self._build_p4(ilgan, akyon_slot_id, ohang_excess),
+            p4=p4_yeonwoo,
+            p4_doyoon=p4_doyoon,
             p5=self._build_p5(ilgan, charm, sal_keys),
             p6=p6,
             p7=self._build_p7(ilgan),
@@ -423,6 +435,58 @@ class ComposePaidReportUseCase:
                 user_name=user_name, ilgan=ilgan
             ),
             bubble_quote="이거 알고 계신 것만으로도 달라져요. 진짜로요.",
+        )
+
+    # ── P-4 (도윤 패널) ──────────────────────────────────────
+    def _build_p4_doyoon(
+        self, ilgan: str, akyon_slot_id: str, user_name: str
+    ) -> PaidChapterP4Doyoon | None:
+        """도윤 P-4 합성 — 비호환 유형 + 착각 인연."""
+        try:
+            from app.domains.ai.application.response.paid_report_response import (
+                AkyonInfoRowDoyoon,
+                IllusionSignDoyoon,
+            )
+            from app.domains.ai.domain.value_object.doyoon_p4_data import (
+                ACCURACY_MULTIPLIER,
+                DECISIVE_GRADIENT_LABEL,
+                DOYOON_AKYON_BY_SLOT,
+                DOYOON_P4_DATA,
+                FAKE_DROP_PCT,
+                REAL_GROWTH_PCT,
+            )
+
+            ai_akyon = compose_doyoon_p4_akyon(
+                user_name=user_name, ilgan=ilgan, akyon_slot_id=akyon_slot_id
+            )
+            ai_illusion = compose_doyoon_p4_illusion(
+                user_name=user_name, ilgan=ilgan
+            )
+            a = DOYOON_AKYON_BY_SLOT.get(akyon_slot_id) or DOYOON_AKYON_BY_SLOT["m-water-yang"]
+            d = DOYOON_P4_DATA[ilgan]
+        except (KeyError, ValueError):
+            return None
+
+        return PaidChapterP4Doyoon(
+            user_name=user_name,
+            akyon_slot_id=akyon_slot_id,
+            keyword_tags=list(a.keyword_tags),
+            info_rows=[
+                AkyonInfoRowDoyoon(key=r.key, val=r.val) for r in a.info_rows
+            ],
+            ai_akyon=ai_akyon,
+            sd_avatar_asset=a.sd_avatar_asset,
+            akyon_bubble=a.akyon_bubble,
+            illusion_signs=[
+                IllusionSignDoyoon(keyword=s.keyword, pct=s.pct, desc=s.desc)
+                for s in d.illusion_signs
+            ],
+            ai_illusion=ai_illusion,
+            illusion_bubble=d.illusion_bubble,
+            decisive_gradient_label=DECISIVE_GRADIENT_LABEL,
+            real_growth_pct=REAL_GROWTH_PCT,
+            fake_drop_pct=FAKE_DROP_PCT,
+            accuracy_multiplier=ACCURACY_MULTIPLIER,
         )
 
     # ── P-3 (도윤 패널) ──────────────────────────────────────

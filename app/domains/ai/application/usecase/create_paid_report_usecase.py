@@ -59,6 +59,12 @@ if TYPE_CHECKING:
     from app.domains.ai.application.usecase.generate_p3_pattern_usecase import (
         GenerateP3PatternUseCase,
     )
+    from app.domains.ai.application.usecase.generate_p4_akyon_usecase import (
+        GenerateP4AkyonUseCase,
+    )
+    from app.domains.ai.application.usecase.generate_p4_illusion_usecase import (
+        GenerateP4IllusionUseCase,
+    )
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
     )
@@ -131,6 +137,8 @@ class CreatePaidReportUseCase:
         p2_recovery_usecase: GenerateP2RecoveryUseCase | None = None,
         p3_blockade_usecase: GenerateP3BlockadeUseCase | None = None,
         p3_pattern_usecase: GenerateP3PatternUseCase | None = None,
+        p4_akyon_usecase: GenerateP4AkyonUseCase | None = None,
+        p4_illusion_usecase: GenerateP4IllusionUseCase | None = None,
         email_sender: SendResultLinkEmailUseCase | None = None,
         user_repo: UserRepository | None = None,
     ) -> None:
@@ -147,6 +155,8 @@ class CreatePaidReportUseCase:
         self._p2_recovery_usecase = p2_recovery_usecase
         self._p3_blockade_usecase = p3_blockade_usecase
         self._p3_pattern_usecase = p3_pattern_usecase
+        self._p4_akyon_usecase = p4_akyon_usecase
+        self._p4_illusion_usecase = p4_illusion_usecase
         self._email_sender = email_sender
         self._user_repo = user_repo
 
@@ -452,6 +462,30 @@ class CreatePaidReportUseCase:
                 self._p3_pattern_usecase.execute(user_name=user_name, ilgan=ilgan),
             ))
 
+        # P-4 ai_akyon (akyon_slot_id는 response.p4_doyoon에서 가져옴)
+        if (
+            self._p4_akyon_usecase is not None
+            and response.p4_doyoon is not None
+        ):
+            tasks.append((
+                "p4_akyon",
+                self._p4_akyon_usecase.execute(
+                    user_name=user_name,
+                    ilgan=ilgan,
+                    akyon_slot_id=response.p4_doyoon.akyon_slot_id,
+                ),
+            ))
+
+        # P-4 ai_illusion
+        if (
+            self._p4_illusion_usecase is not None
+            and response.p4_doyoon is not None
+        ):
+            tasks.append((
+                "p4_illusion",
+                self._p4_illusion_usecase.execute(user_name=user_name, ilgan=ilgan),
+            ))
+
         if not tasks:
             return
 
@@ -483,3 +517,7 @@ class CreatePaidReportUseCase:
                 response.p3_doyoon.ai_blockade = ai_text
             elif name == "p3_pattern" and response.p3_doyoon is not None:
                 response.p3_doyoon.ai_pattern = ai_text
+            elif name == "p4_akyon" and response.p4_doyoon is not None:
+                response.p4_doyoon.ai_akyon = ai_text
+            elif name == "p4_illusion" and response.p4_doyoon is not None:
+                response.p4_doyoon.ai_illusion = ai_text
