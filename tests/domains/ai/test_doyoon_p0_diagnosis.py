@@ -204,9 +204,9 @@ async def test_usecase_returns_ai_text_on_success() -> None:
         user_name="홍길동", ilgan="임수", ohang_excess="수", ohang_lack="토"
     )
     assert out == ai_text
-    # haiku 모델로 호출됐는지 확인
+    # P-10과 동일 sonnet 4.6 모델로 호출 (톤 일관성)
     assert len(fake.calls) == 1
-    assert fake.calls[0]["model"] == "claude-haiku-4-5-20251001"
+    assert fake.calls[0]["model"] == "claude-sonnet-4-6"
 
 
 @pytest.mark.asyncio

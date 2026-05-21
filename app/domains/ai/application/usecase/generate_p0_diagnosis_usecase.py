@@ -34,8 +34,9 @@ from app.domains.ai.domain.templates.doyoon_p0_intro import (
 
 logger = logging.getLogger(__name__)
 
-# Haiku 4.5 — 짧은 단락 (220~340자) 생성에 충분 + 비용 효율 (~3원/회 vs sonnet 21원).
-DOYOON_P0_MODEL = "claude-haiku-4-5-20251001"
+# Sonnet 4.6 — P-10 letter와 동일 모델. 톤 일관성 + 페르소나 정합성 위해 선택.
+# Haiku 대비 회당 +7원이지만 도윤 100건/일 기준 월 2만원 차이로 첫인상 품질 확보.
+DOYOON_P0_MODEL = "claude-sonnet-4-6"
 
 # AI 호출 파라미터
 _MAX_TOKENS = 600       # 한국어 4단락 340자 ≈ 출력 토큰 ~500 + 안전 마진
