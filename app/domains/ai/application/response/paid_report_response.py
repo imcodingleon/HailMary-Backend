@@ -446,6 +446,51 @@ class PointCard(BaseModel):
     sub: str
 
 
+# ═════════════════════════════════════════════════════════════════
+# P-5 도윤 패널 — 三 매력 분석
+# ═════════════════════════════════════════════════════════════════
+
+
+class RadarAxisDoyoon(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    name: str
+    value: int
+
+
+class ConversionStepDoyoon(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    label: str
+    pct: int
+
+
+class AppealMeterDoyoon(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    name: str
+    value: int
+
+
+class PaidChapterP5Doyoon(BaseModel):
+    """P-5 도윤 패널 — 매력 지수 + 전환율 + 호감 유발."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_name: str
+    # 3-1
+    charm_pct: str                              # "상위 N%"
+    radar: list[RadarAxisDoyoon]                # 6
+    strength_axis_1: str
+    strength_axis_2: str
+    strength_multiplier: str
+    ai_charm_index: str
+    sd_avatar_asset: str
+    charm_bubble: str
+    # 3-2
+    conversion_steps: list[ConversionStepDoyoon]  # 4
+    ai_conversion: str
+    # 3-3
+    appeal_meters: list[AppealMeterDoyoon]      # 4
+    ai_appeal: str
+
+
 class PaidChapterP5(BaseModel):
     """P-5 — 매력 지수 + 매력살 카드 + 메커니즘 + 포인트."""
     model_config = ConfigDict(populate_by_name=True)
@@ -627,6 +672,7 @@ class PaidChaptersResponse(BaseModel):
     p3_doyoon: PaidChapterP3Doyoon | None = None
     p4: PaidChapterP4 | None = None
     p4_doyoon: PaidChapterP4Doyoon | None = None
+    p5_doyoon: PaidChapterP5Doyoon | None = None
     p5: PaidChapterP5 | None = None
     p6: PaidChapterP6 | None = None
     p7: PaidChapterP7 | None = None

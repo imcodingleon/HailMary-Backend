@@ -42,6 +42,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP3,
     PaidChapterP3Doyoon,
     PaidChapterP4Doyoon,
+    PaidChapterP5Doyoon,
     PaidChapterP4,
     PaidChapterP5,
     PaidChapterP6,
@@ -70,6 +71,11 @@ from app.domains.ai.domain.templates.doyoon_p3_blocking import (
 from app.domains.ai.domain.templates.doyoon_p4_blocking2 import (
     compose_doyoon_p4_akyon,
     compose_doyoon_p4_illusion,
+)
+from app.domains.ai.domain.templates.doyoon_p5_charm import (
+    compose_doyoon_p5_appeal,
+    compose_doyoon_p5_charm_index,
+    compose_doyoon_p5_conversion,
 )
 from app.domains.ai.domain.templates.yeonwoo_p0_intro import compose_p0_intro
 from app.domains.ai.domain.templates.yeonwoo_p1_chapter_opening import (
@@ -254,22 +260,26 @@ class ComposePaidReportUseCase:
             p4_doyoon = self._build_p4_doyoon(
                 ilgan, akyon_slot_id, user_name or ""
             )
+            p5_doyoon = self._build_p5_doyoon(ilgan, charm, sal_keys, user_name or "")
             p0_yeonwoo = None
             p1_yeonwoo = None
             p2_yeonwoo = None
             p3_yeonwoo = None
             p4_yeonwoo = None
+            p5_yeonwoo = None
         else:
             p0_doyoon = None
             p1_doyoon = None
             p2_doyoon = None
             p3_doyoon = None
             p4_doyoon = None
+            p5_doyoon = None
             p0_yeonwoo = self._build_p0(vars_, ilgan, ohang_excess, ohang_lack)
             p1_yeonwoo = self._build_p1(ilgan, ilju)
             p2_yeonwoo = self._build_p2(ilgan)
             p3_yeonwoo = self._build_p3(ilgan, ohang_excess)
             p4_yeonwoo = self._build_p4(ilgan, akyon_slot_id, ohang_excess)
+            p5_yeonwoo = self._build_p5(ilgan, charm, sal_keys)
 
         return PaidChaptersResponse(
             p0=p0_yeonwoo,
@@ -282,7 +292,8 @@ class ComposePaidReportUseCase:
             p3_doyoon=p3_doyoon,
             p4=p4_yeonwoo,
             p4_doyoon=p4_doyoon,
-            p5=self._build_p5(ilgan, charm, sal_keys),
+            p5_doyoon=p5_doyoon,
+            p5=p5_yeonwoo,
             p6=p6,
             p7=self._build_p7(ilgan),
             p8=p8,
@@ -435,6 +446,63 @@ class ComposePaidReportUseCase:
                 user_name=user_name, ilgan=ilgan
             ),
             bubble_quote="이거 알고 계신 것만으로도 달라져요. 진짜로요.",
+        )
+
+    # ── P-5 (도윤 패널) ──────────────────────────────────────
+    def _build_p5_doyoon(
+        self,
+        ilgan: str,
+        charm: dict[str, Any],
+        sal_keys: tuple[str, ...],
+        user_name: str,
+    ) -> PaidChapterP5Doyoon | None:
+        """도윤 P-5 합성 — 매력 지수 + 전환율 + 호감 유발."""
+        try:
+            from app.domains.ai.application.response.paid_report_response import (
+                AppealMeterDoyoon,
+                ConversionStepDoyoon,
+                RadarAxisDoyoon,
+            )
+            from app.domains.ai.domain.value_object.doyoon_p5_data import (
+                CONVERSION_STEPS,
+                DOYOON_P5_DATA,
+            )
+
+            d = DOYOON_P5_DATA[ilgan]
+            raw_percentile = int(charm.get("charmPercentile", 0))
+            charm_pct_int = max(1, min(99, 100 - raw_percentile))
+            ai_charm_index = compose_doyoon_p5_charm_index(
+                user_name=user_name, ilgan=ilgan, charm_pct=charm_pct_int
+            )
+            ai_conversion = compose_doyoon_p5_conversion(
+                user_name=user_name, ilgan=ilgan
+            )
+            ai_appeal = compose_doyoon_p5_appeal(
+                user_name=user_name, ilgan=ilgan
+            )
+        except (KeyError, ValueError):
+            return None
+
+        return PaidChapterP5Doyoon(
+            user_name=user_name,
+            charm_pct=f"상위 {charm_pct_int}%",
+            radar=[RadarAxisDoyoon(name=r.name, value=r.value) for r in d.radar],
+            strength_axis_1=d.strength_axis_1,
+            strength_axis_2=d.strength_axis_2,
+            strength_multiplier=d.strength_multiplier,
+            ai_charm_index=ai_charm_index,
+            sd_avatar_asset=d.sd_charm_asset,
+            charm_bubble=d.charm_bubble,
+            conversion_steps=[
+                ConversionStepDoyoon(label=label, pct=pct)
+                for label, pct in CONVERSION_STEPS
+            ],
+            ai_conversion=ai_conversion,
+            appeal_meters=[
+                AppealMeterDoyoon(name=m.name, value=m.value)
+                for m in d.appeal_meters
+            ],
+            ai_appeal=ai_appeal,
         )
 
     # ── P-4 (도윤 패널) ──────────────────────────────────────

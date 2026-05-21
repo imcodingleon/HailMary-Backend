@@ -53,6 +53,15 @@ from app.domains.ai.application.usecase.generate_p4_akyon_usecase import (
 from app.domains.ai.application.usecase.generate_p4_illusion_usecase import (
     GenerateP4IllusionUseCase,
 )
+from app.domains.ai.application.usecase.generate_p5_appeal_usecase import (
+    GenerateP5AppealUseCase,
+)
+from app.domains.ai.application.usecase.generate_p5_charm_index_usecase import (
+    GenerateP5CharmIndexUseCase,
+)
+from app.domains.ai.application.usecase.generate_p5_conversion_usecase import (
+    GenerateP5ConversionUseCase,
+)
 from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
     GenerateP10LetterUseCase,
 )
@@ -220,6 +229,9 @@ def _make_confirm_payment_usecase(
     p3_pattern_usecase: GenerateP3PatternUseCase | None = None
     p4_akyon_usecase: GenerateP4AkyonUseCase | None = None
     p4_illusion_usecase: GenerateP4IllusionUseCase | None = None
+    p5_charm_index_usecase: GenerateP5CharmIndexUseCase | None = None
+    p5_conversion_usecase: GenerateP5ConversionUseCase | None = None
+    p5_appeal_usecase: GenerateP5AppealUseCase | None = None
     if _settings.claude_api_key:
         claude_client = ClaudeClient(
             api_key=_settings.claude_api_key,
@@ -236,6 +248,9 @@ def _make_confirm_payment_usecase(
         p3_pattern_usecase = GenerateP3PatternUseCase(ai_client=claude_client)
         p4_akyon_usecase = GenerateP4AkyonUseCase(ai_client=claude_client)
         p4_illusion_usecase = GenerateP4IllusionUseCase(ai_client=claude_client)
+        p5_charm_index_usecase = GenerateP5CharmIndexUseCase(ai_client=claude_client)
+        p5_conversion_usecase = GenerateP5ConversionUseCase(ai_client=claude_client)
+        p5_appeal_usecase = GenerateP5AppealUseCase(ai_client=claude_client)
     # SES 이메일 발송 (sender + IAM 키 있을 때만, 없으면 폴백)
     email_sender: SendResultLinkEmailUseCase | None = None
     if _settings.aws_ses_sender:
@@ -272,6 +287,9 @@ def _make_confirm_payment_usecase(
         p3_pattern_usecase=p3_pattern_usecase,
         p4_akyon_usecase=p4_akyon_usecase,
         p4_illusion_usecase=p4_illusion_usecase,
+        p5_charm_index_usecase=p5_charm_index_usecase,
+        p5_conversion_usecase=p5_conversion_usecase,
+        p5_appeal_usecase=p5_appeal_usecase,
         email_sender=email_sender,
         user_repo=user_repo,
     )

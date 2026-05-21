@@ -65,6 +65,15 @@ if TYPE_CHECKING:
     from app.domains.ai.application.usecase.generate_p4_illusion_usecase import (
         GenerateP4IllusionUseCase,
     )
+    from app.domains.ai.application.usecase.generate_p5_appeal_usecase import (
+        GenerateP5AppealUseCase,
+    )
+    from app.domains.ai.application.usecase.generate_p5_charm_index_usecase import (
+        GenerateP5CharmIndexUseCase,
+    )
+    from app.domains.ai.application.usecase.generate_p5_conversion_usecase import (
+        GenerateP5ConversionUseCase,
+    )
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
     )
@@ -139,6 +148,9 @@ class CreatePaidReportUseCase:
         p3_pattern_usecase: GenerateP3PatternUseCase | None = None,
         p4_akyon_usecase: GenerateP4AkyonUseCase | None = None,
         p4_illusion_usecase: GenerateP4IllusionUseCase | None = None,
+        p5_charm_index_usecase: GenerateP5CharmIndexUseCase | None = None,
+        p5_conversion_usecase: GenerateP5ConversionUseCase | None = None,
+        p5_appeal_usecase: GenerateP5AppealUseCase | None = None,
         email_sender: SendResultLinkEmailUseCase | None = None,
         user_repo: UserRepository | None = None,
     ) -> None:
@@ -157,6 +169,9 @@ class CreatePaidReportUseCase:
         self._p3_pattern_usecase = p3_pattern_usecase
         self._p4_akyon_usecase = p4_akyon_usecase
         self._p4_illusion_usecase = p4_illusion_usecase
+        self._p5_charm_index_usecase = p5_charm_index_usecase
+        self._p5_conversion_usecase = p5_conversion_usecase
+        self._p5_appeal_usecase = p5_appeal_usecase
         self._email_sender = email_sender
         self._user_repo = user_repo
 
@@ -486,6 +501,42 @@ class CreatePaidReportUseCase:
                 self._p4_illusion_usecase.execute(user_name=user_name, ilgan=ilgan),
             ))
 
+        # P-5 ai_charm_index (charm_pct는 response.p5_doyoon에서 추출)
+        if (
+            self._p5_charm_index_usecase is not None
+            and response.p5_doyoon is not None
+        ):
+            # "상위 N%" → N int 추출
+            import re as _re
+            m = _re.search(r"(\d+)", response.p5_doyoon.charm_pct)
+            charm_pct_int = int(m.group(1)) if m else 50
+            tasks.append((
+                "p5_charm_index",
+                self._p5_charm_index_usecase.execute(
+                    user_name=user_name, ilgan=ilgan, charm_pct=charm_pct_int
+                ),
+            ))
+
+        # P-5 ai_conversion
+        if (
+            self._p5_conversion_usecase is not None
+            and response.p5_doyoon is not None
+        ):
+            tasks.append((
+                "p5_conversion",
+                self._p5_conversion_usecase.execute(user_name=user_name, ilgan=ilgan),
+            ))
+
+        # P-5 ai_appeal
+        if (
+            self._p5_appeal_usecase is not None
+            and response.p5_doyoon is not None
+        ):
+            tasks.append((
+                "p5_appeal",
+                self._p5_appeal_usecase.execute(user_name=user_name, ilgan=ilgan),
+            ))
+
         if not tasks:
             return
 
@@ -521,3 +572,9 @@ class CreatePaidReportUseCase:
                 response.p4_doyoon.ai_akyon = ai_text
             elif name == "p4_illusion" and response.p4_doyoon is not None:
                 response.p4_doyoon.ai_illusion = ai_text
+            elif name == "p5_charm_index" and response.p5_doyoon is not None:
+                response.p5_doyoon.ai_charm_index = ai_text
+            elif name == "p5_conversion" and response.p5_doyoon is not None:
+                response.p5_doyoon.ai_conversion = ai_text
+            elif name == "p5_appeal" and response.p5_doyoon is not None:
+                response.p5_doyoon.ai_appeal = ai_text
