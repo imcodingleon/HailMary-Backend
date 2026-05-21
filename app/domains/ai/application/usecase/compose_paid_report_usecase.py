@@ -43,6 +43,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP3Doyoon,
     PaidChapterP4Doyoon,
     PaidChapterP5Doyoon,
+    PaidChapterP6Doyoon,
     PaidChapterP4,
     PaidChapterP5,
     PaidChapterP6,
@@ -76,6 +77,11 @@ from app.domains.ai.domain.templates.doyoon_p5_charm import (
     compose_doyoon_p5_appeal,
     compose_doyoon_p5_charm_index,
     compose_doyoon_p5_conversion,
+)
+from app.domains.ai.domain.templates.doyoon_p6_destined import (
+    compose_doyoon_p6_meeting,
+    compose_doyoon_p6_pattern,
+    compose_doyoon_p6_profile,
 )
 from app.domains.ai.domain.templates.yeonwoo_p0_intro import compose_p0_intro
 from app.domains.ai.domain.templates.yeonwoo_p1_chapter_opening import (
@@ -261,6 +267,9 @@ class ComposePaidReportUseCase:
                 ilgan, akyon_slot_id, user_name or ""
             )
             p5_doyoon = self._build_p5_doyoon(ilgan, charm, sal_keys, user_name or "")
+            p6_doyoon = self._build_p6_doyoon(
+                ilgan, match_slot_id, ohang_lack, charm, user_name or ""
+            )
             p0_yeonwoo = None
             p1_yeonwoo = None
             p2_yeonwoo = None
@@ -274,6 +283,7 @@ class ComposePaidReportUseCase:
             p3_doyoon = None
             p4_doyoon = None
             p5_doyoon = None
+            p6_doyoon = None
             p0_yeonwoo = self._build_p0(vars_, ilgan, ohang_excess, ohang_lack)
             p1_yeonwoo = self._build_p1(ilgan, ilju)
             p2_yeonwoo = self._build_p2(ilgan)
@@ -294,6 +304,7 @@ class ComposePaidReportUseCase:
             p4_doyoon=p4_doyoon,
             p5_doyoon=p5_doyoon,
             p5=p5_yeonwoo,
+            p6_doyoon=p6_doyoon,
             p6=p6,
             p7=self._build_p7(ilgan),
             p8=p8,
@@ -446,6 +457,67 @@ class ComposePaidReportUseCase:
                 user_name=user_name, ilgan=ilgan
             ),
             bubble_quote="이거 알고 계신 것만으로도 달라져요. 진짜로요.",
+        )
+
+    # ── P-6 (도윤 패널) ──────────────────────────────────────
+    def _build_p6_doyoon(
+        self,
+        ilgan: str,
+        match_slot_id: str,
+        ohang_lack: str,
+        charm: dict[str, Any],
+        user_name: str,
+    ) -> PaidChapterP6Doyoon | None:
+        """도윤 P-6 합성 — 인연 프로파일 + 만남 + 행동 패턴."""
+        try:
+            from app.domains.ai.application.response.paid_report_response import (
+                BehaviorCardDoyoon,
+                InyonInfoRowDoyoon,
+            )
+            from app.domains.ai.domain.value_object.doyoon_p6_data import (
+                DOYOON_INYON_BY_SLOT,
+                DOYOON_P6_DATA,
+                P6_SD_BEHAVIOR_ASSET,
+            )
+
+            raw_percentile = int(charm.get("charmPercentile", 0))
+            pct_value_int = max(1, min(99, 100 - raw_percentile))
+
+            ai_profile = compose_doyoon_p6_profile(
+                user_name=user_name, ilgan=ilgan,
+                match_slot_id=match_slot_id, pct_value=pct_value_int,
+                ohang_lack=ohang_lack,
+            )
+            ai_meeting = compose_doyoon_p6_meeting(
+                user_name=user_name, ilgan=ilgan, match_slot_id=match_slot_id
+            )
+            ai_pattern = compose_doyoon_p6_pattern(user_name=user_name, ilgan=ilgan)
+            i = DOYOON_INYON_BY_SLOT.get(match_slot_id) or DOYOON_INYON_BY_SLOT["f-water-yang"]
+            d = DOYOON_P6_DATA[ilgan]
+        except (KeyError, ValueError):
+            return None
+
+        return PaidChapterP6Doyoon(
+            user_name=user_name,
+            match_slot_id=match_slot_id,
+            pct_value=f"상위 {pct_value_int}%",
+            keyword_tags=list(i.keyword_tags),
+            info_rows=[
+                InyonInfoRowDoyoon(key=r.key, val=r.val) for r in i.info_rows
+            ],
+            compatibility_pct=i.compatibility_pct,
+            ai_profile=ai_profile,
+            ai_meeting=ai_meeting,
+            profile_bubble=i.profile_bubble.replace("{USER_NAME}", user_name),
+            interest_score=d.interest_score,
+            expression_score=d.expression_score,
+            durability_score=d.durability_score,
+            behavior_cards=[
+                BehaviorCardDoyoon(label=c.label, keyword=c.keyword, desc=c.desc)
+                for c in d.behavior_cards
+            ],
+            ai_pattern=ai_pattern,
+            sd_avatar_asset=P6_SD_BEHAVIOR_ASSET,
         )
 
     # ── P-5 (도윤 패널) ──────────────────────────────────────

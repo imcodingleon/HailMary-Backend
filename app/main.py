@@ -62,6 +62,15 @@ from app.domains.ai.application.usecase.generate_p5_charm_index_usecase import (
 from app.domains.ai.application.usecase.generate_p5_conversion_usecase import (
     GenerateP5ConversionUseCase,
 )
+from app.domains.ai.application.usecase.generate_p6_meeting_usecase import (
+    GenerateP6MeetingUseCase,
+)
+from app.domains.ai.application.usecase.generate_p6_pattern_usecase import (
+    GenerateP6PatternUseCase,
+)
+from app.domains.ai.application.usecase.generate_p6_profile_usecase import (
+    GenerateP6ProfileUseCase,
+)
 from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
     GenerateP10LetterUseCase,
 )
@@ -232,6 +241,9 @@ def _make_confirm_payment_usecase(
     p5_charm_index_usecase: GenerateP5CharmIndexUseCase | None = None
     p5_conversion_usecase: GenerateP5ConversionUseCase | None = None
     p5_appeal_usecase: GenerateP5AppealUseCase | None = None
+    p6_profile_usecase: GenerateP6ProfileUseCase | None = None
+    p6_meeting_usecase: GenerateP6MeetingUseCase | None = None
+    p6_pattern_usecase: GenerateP6PatternUseCase | None = None
     if _settings.claude_api_key:
         claude_client = ClaudeClient(
             api_key=_settings.claude_api_key,
@@ -251,6 +263,9 @@ def _make_confirm_payment_usecase(
         p5_charm_index_usecase = GenerateP5CharmIndexUseCase(ai_client=claude_client)
         p5_conversion_usecase = GenerateP5ConversionUseCase(ai_client=claude_client)
         p5_appeal_usecase = GenerateP5AppealUseCase(ai_client=claude_client)
+        p6_profile_usecase = GenerateP6ProfileUseCase(ai_client=claude_client)
+        p6_meeting_usecase = GenerateP6MeetingUseCase(ai_client=claude_client)
+        p6_pattern_usecase = GenerateP6PatternUseCase(ai_client=claude_client)
     # SES 이메일 발송 (sender + IAM 키 있을 때만, 없으면 폴백)
     email_sender: SendResultLinkEmailUseCase | None = None
     if _settings.aws_ses_sender:
@@ -290,6 +305,9 @@ def _make_confirm_payment_usecase(
         p5_charm_index_usecase=p5_charm_index_usecase,
         p5_conversion_usecase=p5_conversion_usecase,
         p5_appeal_usecase=p5_appeal_usecase,
+        p6_profile_usecase=p6_profile_usecase,
+        p6_meeting_usecase=p6_meeting_usecase,
+        p6_pattern_usecase=p6_pattern_usecase,
         email_sender=email_sender,
         user_repo=user_repo,
     )

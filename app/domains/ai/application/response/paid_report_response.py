@@ -519,6 +519,47 @@ class InnerCard(BaseModel):
     sub: str
 
 
+# ═════════════════════════════════════════════════════════════════
+# P-6 도윤 패널 — 四 운명의 짝 (1/2)
+# ═════════════════════════════════════════════════════════════════
+
+
+class InyonInfoRowDoyoon(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    key: str
+    val: str
+
+
+class BehaviorCardDoyoon(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    label: str
+    keyword: str
+    desc: str
+
+
+class PaidChapterP6Doyoon(BaseModel):
+    """P-6 도윤 패널 — 인연 프로파일 + 만남 + 행동 패턴."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_name: str
+    # 4-1 인연 프로파일
+    match_slot_id: str
+    pct_value: str                              # "상위 N%"
+    keyword_tags: list[str]                     # 5
+    info_rows: list[InyonInfoRowDoyoon]         # 9
+    compatibility_pct: str                      # "82%"
+    ai_profile: str
+    ai_meeting: str
+    profile_bubble: str
+    # 4-2 행동 패턴
+    interest_score: int
+    expression_score: int
+    durability_score: int
+    behavior_cards: list[BehaviorCardDoyoon]    # 2
+    ai_pattern: str
+    sd_avatar_asset: str                        # "dy_07"
+
+
 class PaidChapterP6(BaseModel):
     """P-6 — 4-1 인연 외형/매칭/첫 만남 + 4-2 속마음 투시."""
     model_config = ConfigDict(populate_by_name=True)
@@ -675,6 +716,7 @@ class PaidChaptersResponse(BaseModel):
     p5_doyoon: PaidChapterP5Doyoon | None = None
     p5: PaidChapterP5 | None = None
     p6: PaidChapterP6 | None = None
+    p6_doyoon: PaidChapterP6Doyoon | None = None
     p7: PaidChapterP7 | None = None
     p8: PaidChapterP8 | None = None
     p9: PaidChapterP9 | None = None

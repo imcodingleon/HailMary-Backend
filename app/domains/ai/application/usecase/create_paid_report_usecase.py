@@ -74,6 +74,15 @@ if TYPE_CHECKING:
     from app.domains.ai.application.usecase.generate_p5_conversion_usecase import (
         GenerateP5ConversionUseCase,
     )
+    from app.domains.ai.application.usecase.generate_p6_meeting_usecase import (
+        GenerateP6MeetingUseCase,
+    )
+    from app.domains.ai.application.usecase.generate_p6_pattern_usecase import (
+        GenerateP6PatternUseCase,
+    )
+    from app.domains.ai.application.usecase.generate_p6_profile_usecase import (
+        GenerateP6ProfileUseCase,
+    )
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
     )
@@ -151,6 +160,9 @@ class CreatePaidReportUseCase:
         p5_charm_index_usecase: GenerateP5CharmIndexUseCase | None = None,
         p5_conversion_usecase: GenerateP5ConversionUseCase | None = None,
         p5_appeal_usecase: GenerateP5AppealUseCase | None = None,
+        p6_profile_usecase: GenerateP6ProfileUseCase | None = None,
+        p6_meeting_usecase: GenerateP6MeetingUseCase | None = None,
+        p6_pattern_usecase: GenerateP6PatternUseCase | None = None,
         email_sender: SendResultLinkEmailUseCase | None = None,
         user_repo: UserRepository | None = None,
     ) -> None:
@@ -172,6 +184,9 @@ class CreatePaidReportUseCase:
         self._p5_charm_index_usecase = p5_charm_index_usecase
         self._p5_conversion_usecase = p5_conversion_usecase
         self._p5_appeal_usecase = p5_appeal_usecase
+        self._p6_profile_usecase = p6_profile_usecase
+        self._p6_meeting_usecase = p6_meeting_usecase
+        self._p6_pattern_usecase = p6_pattern_usecase
         self._email_sender = email_sender
         self._user_repo = user_repo
 
@@ -537,6 +552,47 @@ class CreatePaidReportUseCase:
                 self._p5_appeal_usecase.execute(user_name=user_name, ilgan=ilgan),
             ))
 
+        # P-6 ai_profile (match_slot_id + pct_value 추출)
+        if (
+            self._p6_profile_usecase is not None
+            and response.p6_doyoon is not None
+        ):
+            import re as _re6
+            m = _re6.search(r"(\d+)", response.p6_doyoon.pct_value)
+            pct_value_int = int(m.group(1)) if m else 50
+            tasks.append((
+                "p6_profile",
+                self._p6_profile_usecase.execute(
+                    user_name=user_name, ilgan=ilgan,
+                    match_slot_id=response.p6_doyoon.match_slot_id,
+                    pct_value=pct_value_int,
+                    ohang_lack=lack,
+                ),
+            ))
+
+        # P-6 ai_meeting
+        if (
+            self._p6_meeting_usecase is not None
+            and response.p6_doyoon is not None
+        ):
+            tasks.append((
+                "p6_meeting",
+                self._p6_meeting_usecase.execute(
+                    user_name=user_name, ilgan=ilgan,
+                    match_slot_id=response.p6_doyoon.match_slot_id,
+                ),
+            ))
+
+        # P-6 ai_pattern
+        if (
+            self._p6_pattern_usecase is not None
+            and response.p6_doyoon is not None
+        ):
+            tasks.append((
+                "p6_pattern",
+                self._p6_pattern_usecase.execute(user_name=user_name, ilgan=ilgan),
+            ))
+
         if not tasks:
             return
 
@@ -578,3 +634,9 @@ class CreatePaidReportUseCase:
                 response.p5_doyoon.ai_conversion = ai_text
             elif name == "p5_appeal" and response.p5_doyoon is not None:
                 response.p5_doyoon.ai_appeal = ai_text
+            elif name == "p6_profile" and response.p6_doyoon is not None:
+                response.p6_doyoon.ai_profile = ai_text
+            elif name == "p6_meeting" and response.p6_doyoon is not None:
+                response.p6_doyoon.ai_meeting = ai_text
+            elif name == "p6_pattern" and response.p6_doyoon is not None:
+                response.p6_doyoon.ai_pattern = ai_text
