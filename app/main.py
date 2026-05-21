@@ -35,6 +35,12 @@ from app.domains.ai.application.usecase.generate_p1_opening_usecase import (
 from app.domains.ai.application.usecase.generate_p1_trigger_usecase import (
     GenerateP1TriggerUseCase,
 )
+from app.domains.ai.application.usecase.generate_p2_hurt_usecase import (
+    GenerateP2HurtUseCase,
+)
+from app.domains.ai.application.usecase.generate_p2_recovery_usecase import (
+    GenerateP2RecoveryUseCase,
+)
 from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
     GenerateP10LetterUseCase,
 )
@@ -196,6 +202,8 @@ def _make_confirm_payment_usecase(
     p1_opening_usecase: GenerateP1OpeningUseCase | None = None
     p1_trigger_usecase: GenerateP1TriggerUseCase | None = None
     p1_emotion_usecase: GenerateP1EmotionUseCase | None = None
+    p2_hurt_usecase: GenerateP2HurtUseCase | None = None
+    p2_recovery_usecase: GenerateP2RecoveryUseCase | None = None
     if _settings.claude_api_key:
         claude_client = ClaudeClient(
             api_key=_settings.claude_api_key,
@@ -206,6 +214,8 @@ def _make_confirm_payment_usecase(
         p1_opening_usecase = GenerateP1OpeningUseCase(ai_client=claude_client)
         p1_trigger_usecase = GenerateP1TriggerUseCase(ai_client=claude_client)
         p1_emotion_usecase = GenerateP1EmotionUseCase(ai_client=claude_client)
+        p2_hurt_usecase = GenerateP2HurtUseCase(ai_client=claude_client)
+        p2_recovery_usecase = GenerateP2RecoveryUseCase(ai_client=claude_client)
     # SES 이메일 발송 (sender + IAM 키 있을 때만, 없으면 폴백)
     email_sender: SendResultLinkEmailUseCase | None = None
     if _settings.aws_ses_sender:
@@ -236,6 +246,8 @@ def _make_confirm_payment_usecase(
         p1_opening_usecase=p1_opening_usecase,
         p1_trigger_usecase=p1_trigger_usecase,
         p1_emotion_usecase=p1_emotion_usecase,
+        p2_hurt_usecase=p2_hurt_usecase,
+        p2_recovery_usecase=p2_recovery_usecase,
         email_sender=email_sender,
         user_repo=user_repo,
     )

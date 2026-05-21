@@ -38,6 +38,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP1,
     PaidChapterP1Doyoon,
     PaidChapterP2,
+    PaidChapterP2Doyoon,
     PaidChapterP3,
     PaidChapterP4,
     PaidChapterP5,
@@ -58,6 +59,8 @@ from app.domains.ai.domain.templates.doyoon_p0_intro import compose_doyoon_p0_in
 from app.domains.ai.domain.templates.doyoon_p1_emotion import compose_doyoon_p1_emotion
 from app.domains.ai.domain.templates.doyoon_p1_opening import compose_doyoon_p1_opening
 from app.domains.ai.domain.templates.doyoon_p1_trigger import compose_doyoon_p1_trigger
+from app.domains.ai.domain.templates.doyoon_p2_hurt import compose_doyoon_p2_hurt
+from app.domains.ai.domain.templates.doyoon_p2_recovery import compose_doyoon_p2_recovery
 from app.domains.ai.domain.templates.yeonwoo_p0_intro import compose_p0_intro
 from app.domains.ai.domain.templates.yeonwoo_p1_chapter_opening import (
     compose_p1_chapter_opening,
@@ -228,26 +231,31 @@ class ComposePaidReportUseCase:
         p6 = self._build_p6(ilgan, match_slot_id, ohang_lack)
         p8 = self._build_p8(saju_raw, ilgan, start_year, start_month)
 
-        # 도윤 P-0, P-1는 별도 chapters key. 다른 페이지는 점진 추가 예정.
+        # 도윤 P-0, P-1, P-2는 별도 chapters key. 다른 페이지는 점진 추가 예정.
         if character == "doyoon":
             p0_doyoon = self._build_p0_doyoon(
                 vars_, ilgan, ohang_excess, ohang_lack, user_name or ""
             )
             p1_doyoon = self._build_p1_doyoon(ilgan, ilju, user_name or "")
+            p2_doyoon = self._build_p2_doyoon(ilgan, user_name or "")
             p0_yeonwoo = None
             p1_yeonwoo = None
+            p2_yeonwoo = None
         else:
             p0_doyoon = None
             p1_doyoon = None
+            p2_doyoon = None
             p0_yeonwoo = self._build_p0(vars_, ilgan, ohang_excess, ohang_lack)
             p1_yeonwoo = self._build_p1(ilgan, ilju)
+            p2_yeonwoo = self._build_p2(ilgan)
 
         return PaidChaptersResponse(
             p0=p0_yeonwoo,
             p0_doyoon=p0_doyoon,
             p1=p1_yeonwoo,
             p1_doyoon=p1_doyoon,
-            p2=self._build_p2(ilgan),
+            p2=p2_yeonwoo,
+            p2_doyoon=p2_doyoon,
             p3=self._build_p3(ilgan, ohang_excess),
             p4=self._build_p4(ilgan, akyon_slot_id, ohang_excess),
             p5=self._build_p5(ilgan, charm, sal_keys),
@@ -403,6 +411,50 @@ class ComposePaidReportUseCase:
                 user_name=user_name, ilgan=ilgan
             ),
             bubble_quote="이거 알고 계신 것만으로도 달라져요. 진짜로요.",
+        )
+
+    # ── P-2 (도윤 패널) ──────────────────────────────────────
+    def _build_p2_doyoon(
+        self, ilgan: str, user_name: str
+    ) -> PaidChapterP2Doyoon | None:
+        """도윤 P-2 합성 — 약점 트리거 + 회복 곡선.
+
+        본 세션 임수 셀만 정성 완성, 나머지 9 셀은 압축. 향후 사용자 검수.
+        ilgan unknown 시 None 반환 (graceful — 프론트 MOCK fallback).
+        """
+        try:
+            hurt = compose_doyoon_p2_hurt(user_name=user_name, ilgan=ilgan)
+            recovery_dict = compose_doyoon_p2_recovery(
+                user_name=user_name, ilgan=ilgan
+            )
+        except (KeyError, ValueError):
+            return None
+
+        from app.domains.ai.domain.value_object.doyoon_p2_data import (
+            DOYOON_P2_DATA,
+        )
+        data = DOYOON_P2_DATA[ilgan]
+        timeline_rows = [
+            RecoveryTimelineRow(**cast(dict[str, str], row))
+            for row in cast(list[dict[str, str]], recovery_dict["timeline"])
+        ]
+        accel_dict = cast(dict[str, str], recovery_dict["accel"])
+        accel = RecoveryAccel(value=accel_dict["value"], sub=accel_dict["sub"])
+
+        return PaidChapterP2Doyoon(
+            user_name=user_name,
+            scenario_1_when=hurt["scenario_1_when"],
+            scenario_1_desc=hurt["scenario_1_desc"],
+            scenario_2_when=hurt["scenario_2_when"],
+            scenario_2_desc=hurt["scenario_2_desc"],
+            vulnerability_pct=data.vulnerability_pct,
+            common_pattern_pct=data.common_pattern_pct,
+            ai_hurt=hurt["ai_hurt"],
+            hurt_bubble=hurt["bubble"],
+            recovery_timeline=timeline_rows,
+            recovery_accel=accel,
+            recovery_lag_multiplier=data.recovery_lag_multiplier,
+            ai_recovery=cast(str, recovery_dict["ai_recovery"]),
         )
 
     # ── P-1 ──────────────────────────────────────────────────

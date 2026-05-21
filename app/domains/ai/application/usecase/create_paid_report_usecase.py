@@ -47,6 +47,12 @@ if TYPE_CHECKING:
     from app.domains.ai.application.usecase.generate_p1_trigger_usecase import (
         GenerateP1TriggerUseCase,
     )
+    from app.domains.ai.application.usecase.generate_p2_hurt_usecase import (
+        GenerateP2HurtUseCase,
+    )
+    from app.domains.ai.application.usecase.generate_p2_recovery_usecase import (
+        GenerateP2RecoveryUseCase,
+    )
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
     )
@@ -115,6 +121,8 @@ class CreatePaidReportUseCase:
         p1_opening_usecase: GenerateP1OpeningUseCase | None = None,
         p1_trigger_usecase: GenerateP1TriggerUseCase | None = None,
         p1_emotion_usecase: GenerateP1EmotionUseCase | None = None,
+        p2_hurt_usecase: GenerateP2HurtUseCase | None = None,
+        p2_recovery_usecase: GenerateP2RecoveryUseCase | None = None,
         email_sender: SendResultLinkEmailUseCase | None = None,
         user_repo: UserRepository | None = None,
     ) -> None:
@@ -127,6 +135,8 @@ class CreatePaidReportUseCase:
         self._p1_opening_usecase = p1_opening_usecase
         self._p1_trigger_usecase = p1_trigger_usecase
         self._p1_emotion_usecase = p1_emotion_usecase
+        self._p2_hurt_usecase = p2_hurt_usecase
+        self._p2_recovery_usecase = p2_recovery_usecase
         self._email_sender = email_sender
         self._user_repo = user_repo
 
@@ -389,6 +399,26 @@ class CreatePaidReportUseCase:
                 self._p1_emotion_usecase.execute(user_name=user_name, ilgan=ilgan),
             ))
 
+        # P-2 ai_hurt
+        if (
+            self._p2_hurt_usecase is not None
+            and response.p2_doyoon is not None
+        ):
+            tasks.append((
+                "p2_hurt",
+                self._p2_hurt_usecase.execute(user_name=user_name, ilgan=ilgan),
+            ))
+
+        # P-2 ai_recovery
+        if (
+            self._p2_recovery_usecase is not None
+            and response.p2_doyoon is not None
+        ):
+            tasks.append((
+                "p2_recovery",
+                self._p2_recovery_usecase.execute(user_name=user_name, ilgan=ilgan),
+            ))
+
         if not tasks:
             return
 
@@ -412,3 +442,7 @@ class CreatePaidReportUseCase:
                 response.p1_doyoon.ai_trigger = ai_text
             elif name == "p1_emotion" and response.p1_doyoon is not None:
                 response.p1_doyoon.ai_emotion = ai_text
+            elif name == "p2_hurt" and response.p2_doyoon is not None:
+                response.p2_doyoon.ai_hurt = ai_text
+            elif name == "p2_recovery" and response.p2_doyoon is not None:
+                response.p2_doyoon.ai_recovery = ai_text
