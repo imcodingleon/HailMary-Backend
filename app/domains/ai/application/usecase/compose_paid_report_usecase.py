@@ -44,6 +44,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP4Doyoon,
     PaidChapterP5Doyoon,
     PaidChapterP6Doyoon,
+    PaidChapterP7Doyoon,
     PaidChapterP4,
     PaidChapterP5,
     PaidChapterP6,
@@ -82,6 +83,9 @@ from app.domains.ai.domain.templates.doyoon_p6_destined import (
     compose_doyoon_p6_meeting,
     compose_doyoon_p6_pattern,
     compose_doyoon_p6_profile,
+)
+from app.domains.ai.domain.templates.doyoon_p7_ending import (
+    compose_doyoon_p7_ending,
 )
 from app.domains.ai.domain.templates.yeonwoo_p0_intro import compose_p0_intro
 from app.domains.ai.domain.templates.yeonwoo_p1_chapter_opening import (
@@ -270,6 +274,7 @@ class ComposePaidReportUseCase:
             p6_doyoon = self._build_p6_doyoon(
                 ilgan, match_slot_id, ohang_lack, charm, user_name or ""
             )
+            p7_doyoon = self._build_p7_doyoon(ilgan, user_name or "")
             p0_yeonwoo = None
             p1_yeonwoo = None
             p2_yeonwoo = None
@@ -284,6 +289,7 @@ class ComposePaidReportUseCase:
             p4_doyoon = None
             p5_doyoon = None
             p6_doyoon = None
+            p7_doyoon = None
             p0_yeonwoo = self._build_p0(vars_, ilgan, ohang_excess, ohang_lack)
             p1_yeonwoo = self._build_p1(ilgan, ilju)
             p2_yeonwoo = self._build_p2(ilgan)
@@ -305,6 +311,7 @@ class ComposePaidReportUseCase:
             p5_doyoon=p5_doyoon,
             p5=p5_yeonwoo,
             p6_doyoon=p6_doyoon,
+            p7_doyoon=p7_doyoon,
             p6=p6,
             p7=self._build_p7(ilgan),
             p8=p8,
@@ -457,6 +464,40 @@ class ComposePaidReportUseCase:
                 user_name=user_name, ilgan=ilgan
             ),
             bubble_quote="이거 알고 계신 것만으로도 달라져요. 진짜로요.",
+        )
+
+    # ── P-7 (도윤 패널) ──────────────────────────────────────
+    def _build_p7_doyoon(
+        self, ilgan: str, user_name: str,
+    ) -> PaidChapterP7Doyoon | None:
+        """도윤 P-7 합성 — 결말 시나리오."""
+        try:
+            from app.domains.ai.application.response.paid_report_response import (
+                ScenarioCardDoyoon,
+            )
+            from app.domains.ai.domain.value_object.doyoon_p7_data import (
+                DOYOON_P7_DATA,
+            )
+
+            ai_ending = compose_doyoon_p7_ending(user_name=user_name, ilgan=ilgan)
+            d = DOYOON_P7_DATA[ilgan]
+        except (KeyError, ValueError):
+            return None
+
+        return PaidChapterP7Doyoon(
+            user_name=user_name,
+            scenarios=[
+                ScenarioCardDoyoon(
+                    prob_label=s.prob_label,
+                    prob_tone=s.prob_tone,  # type: ignore[arg-type]
+                    title=s.title.replace("{USER_NAME}", user_name),
+                    desc=s.desc,
+                )
+                for s in d.scenarios
+            ],
+            ai_ending=ai_ending,
+            sd_avatar_asset=d.sd_ending_asset,
+            ending_bubble=d.ending_bubble.replace("{USER_NAME}", user_name),
         )
 
     # ── P-6 (도윤 패널) ──────────────────────────────────────

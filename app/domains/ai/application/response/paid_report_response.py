@@ -592,6 +592,30 @@ class EndingCard(BaseModel):
     tone: Literal["warn", "good", "amber"]
 
 
+# ═════════════════════════════════════════════════════════════════
+# P-7 도윤 패널 — 四 운명의 짝 · 결말 (2/2)
+# ═════════════════════════════════════════════════════════════════
+
+
+class ScenarioCardDoyoon(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    prob_label: str
+    prob_tone: Literal["low", "high", "best"]
+    title: str
+    desc: str
+
+
+class PaidChapterP7Doyoon(BaseModel):
+    """P-7 도윤 패널 — 결말 시나리오."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_name: str
+    scenarios: list[ScenarioCardDoyoon]   # 3
+    ai_ending: str
+    sd_avatar_asset: str                   # "dy_05"
+    ending_bubble: str
+
+
 class PaidChapterP7(BaseModel):
     """P-7 — 4-3 결말 예측 시나리오 (세 갈래 + AI 권유)."""
     model_config = ConfigDict(populate_by_name=True)
@@ -718,6 +742,7 @@ class PaidChaptersResponse(BaseModel):
     p6: PaidChapterP6 | None = None
     p6_doyoon: PaidChapterP6Doyoon | None = None
     p7: PaidChapterP7 | None = None
+    p7_doyoon: PaidChapterP7Doyoon | None = None
     p8: PaidChapterP8 | None = None
     p9: PaidChapterP9 | None = None
     p10: PaidChapterP10 | None = None

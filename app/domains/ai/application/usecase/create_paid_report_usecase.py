@@ -83,6 +83,9 @@ if TYPE_CHECKING:
     from app.domains.ai.application.usecase.generate_p6_profile_usecase import (
         GenerateP6ProfileUseCase,
     )
+    from app.domains.ai.application.usecase.generate_p7_ending_usecase import (
+        GenerateP7EndingUseCase,
+    )
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
     )
@@ -163,6 +166,7 @@ class CreatePaidReportUseCase:
         p6_profile_usecase: GenerateP6ProfileUseCase | None = None,
         p6_meeting_usecase: GenerateP6MeetingUseCase | None = None,
         p6_pattern_usecase: GenerateP6PatternUseCase | None = None,
+        p7_ending_usecase: GenerateP7EndingUseCase | None = None,
         email_sender: SendResultLinkEmailUseCase | None = None,
         user_repo: UserRepository | None = None,
     ) -> None:
@@ -187,6 +191,7 @@ class CreatePaidReportUseCase:
         self._p6_profile_usecase = p6_profile_usecase
         self._p6_meeting_usecase = p6_meeting_usecase
         self._p6_pattern_usecase = p6_pattern_usecase
+        self._p7_ending_usecase = p7_ending_usecase
         self._email_sender = email_sender
         self._user_repo = user_repo
 
@@ -593,6 +598,16 @@ class CreatePaidReportUseCase:
                 self._p6_pattern_usecase.execute(user_name=user_name, ilgan=ilgan),
             ))
 
+        # P-7 ai_ending
+        if (
+            self._p7_ending_usecase is not None
+            and response.p7_doyoon is not None
+        ):
+            tasks.append((
+                "p7_ending",
+                self._p7_ending_usecase.execute(user_name=user_name, ilgan=ilgan),
+            ))
+
         if not tasks:
             return
 
@@ -640,3 +655,5 @@ class CreatePaidReportUseCase:
                 response.p6_doyoon.ai_meeting = ai_text
             elif name == "p6_pattern" and response.p6_doyoon is not None:
                 response.p6_doyoon.ai_pattern = ai_text
+            elif name == "p7_ending" and response.p7_doyoon is not None:
+                response.p7_doyoon.ai_ending = ai_text
