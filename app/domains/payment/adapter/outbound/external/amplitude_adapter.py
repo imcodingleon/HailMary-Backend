@@ -35,6 +35,7 @@ class AmplitudeAnalyticsAdapter(AnalyticsPort):
         card_issuer_code: str | None,
         bank_code: str | None,
         approved_at: datetime,
+        gender: str | None,
     ) -> None:
         event: dict[str, Any] = {
             "event_type": "payment_completed",
@@ -49,6 +50,7 @@ class AmplitudeAnalyticsAdapter(AnalyticsPort):
                 "bank_code": bank_code,
                 "paid_at": approved_at.isoformat(),
                 "environment": self._environment,
+                "gender": gender,
             },
             "time": int(approved_at.timestamp() * 1000),
             "insert_id": f"payment_completed-{order_id}",

@@ -67,6 +67,16 @@ class UserLookupPort(Protocol):
     async def find_user_id_by_session_token(self, token: str) -> int | None: ...
 
 
+class UserDemographicsPort(Protocol):
+    """user_id로 분석용 인구통계(현재는 gender)를 조회하는 hook.
+
+    Hexagonal 룰: payment 도메인은 user 도메인을 직접 import하지 않는다.
+    main.py가 user_repo 기반 어댑터를 주입한다. 사용자 없으면 None 반환.
+    """
+
+    async def find_gender_by_user_id(self, user_id: int) -> str | None: ...
+
+
 class ConfirmPaymentUseCase:
     def __init__(
         self,
@@ -76,6 +86,7 @@ class ConfirmPaymentUseCase:
         paid_report_creator: PaidReportCreatorPort | None = None,
         saju_hash_resolver: SajuHashResolverPort | None = None,
         analytics: AnalyticsPort | None = None,
+        user_demographics: UserDemographicsPort | None = None,
     ) -> None:
         self._gateway = gateway
         self._repo = repo
@@ -83,6 +94,7 @@ class ConfirmPaymentUseCase:
         self._paid_report_creator = paid_report_creator
         self._saju_hash_resolver = saju_hash_resolver
         self._analytics = analytics
+        self._user_demographics = user_demographics
 
     async def execute(self, request: ConfirmPaymentRequest) -> PaymentResponse:
         # 1. 동일 orderId 중복 승인 방지 — idempotent
@@ -168,7 +180,16 @@ class ConfirmPaymentUseCase:
         # 6. Amplitude 분석 이벤트 발화 (fire-and-forget).
         # 실패/지연이 결제 응답에 영향을 주면 안 되므로 create_task 로 분리.
         # PII 정책: customer_email 등은 payload 에 포함 금지 (어댑터의 화이트리스트로 강제).
+        # gender는 익명화된 세그먼트 키로 분석에만 사용 — PII가 아니므로 허용.
         if self._analytics is not None:
+            gender: str | None = None
+            if self._user_demographics is not None:
+                try:
+                    gender = await self._user_demographics.find_gender_by_user_id(
+                        saved.user_id
+                    )
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("user_demographics.find_gender_by_user_id failed: %s", e)
             asyncio.create_task(
                 _safe_track_payment_completed(
                     analytics=self._analytics,
@@ -183,6 +204,7 @@ class ConfirmPaymentUseCase:
                     card_issuer_code=saved.card_issuer_code,
                     bank_code=saved.bank_code,
                     approved_at=saved.approved_at,
+                    gender=gender,
                 )
             )
 
@@ -203,6 +225,7 @@ async def _safe_track_payment_completed(
     card_issuer_code: str | None,
     bank_code: str | None,
     approved_at: datetime,
+    gender: str | None,
 ) -> None:
     """analytics.track_payment_completed 의 모든 예외를 swallow.
 
@@ -222,6 +245,7 @@ async def _safe_track_payment_completed(
             card_issuer_code=card_issuer_code,
             bank_code=bank_code,
             approved_at=approved_at,
+            gender=gender,
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("analytics.track_payment_completed failed: %s", e)
