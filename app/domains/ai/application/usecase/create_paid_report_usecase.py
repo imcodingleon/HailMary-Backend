@@ -86,6 +86,9 @@ if TYPE_CHECKING:
     from app.domains.ai.application.usecase.generate_p7_ending_usecase import (
         GenerateP7EndingUseCase,
     )
+    from app.domains.ai.application.usecase.generate_p8_intro_usecase import (
+        GenerateP8IntroUseCase,
+    )
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
     )
@@ -167,6 +170,7 @@ class CreatePaidReportUseCase:
         p6_meeting_usecase: GenerateP6MeetingUseCase | None = None,
         p6_pattern_usecase: GenerateP6PatternUseCase | None = None,
         p7_ending_usecase: GenerateP7EndingUseCase | None = None,
+        p8_intro_usecase: GenerateP8IntroUseCase | None = None,
         email_sender: SendResultLinkEmailUseCase | None = None,
         user_repo: UserRepository | None = None,
     ) -> None:
@@ -192,6 +196,7 @@ class CreatePaidReportUseCase:
         self._p6_meeting_usecase = p6_meeting_usecase
         self._p6_pattern_usecase = p6_pattern_usecase
         self._p7_ending_usecase = p7_ending_usecase
+        self._p8_intro_usecase = p8_intro_usecase
         self._email_sender = email_sender
         self._user_repo = user_repo
 
@@ -335,6 +340,7 @@ class CreatePaidReportUseCase:
                     ilgan=ilgan_dy,
                     excess=excess_dy,
                     lack=lack_dy,
+                    saju_raw=saju_raw,
                     response=response,
                 )
 
@@ -392,6 +398,7 @@ class CreatePaidReportUseCase:
         ilgan: str,
         excess: str,
         lack: str,
+        saju_raw: dict[str, Any],
         response: Any,
     ) -> None:
         """도윤 P-0 ai_intro + P-1 3슬롯 (opening/trigger/emotion) 병렬 AI 호출.
@@ -608,6 +615,25 @@ class CreatePaidReportUseCase:
                 self._p7_ending_usecase.execute(user_name=user_name, ilgan=ilgan),
             ))
 
+        # P-8 ai_intro (raw_months 재계산)
+        if (
+            self._p8_intro_usecase is not None
+            and response.p8_doyoon is not None
+        ):
+            from datetime import datetime
+            now = datetime.now()
+            raw_months = self._compose_usecase._monthly_flow.compute_full_months(
+                saju_raw, start_year=now.year, start_month=now.month
+            )
+            tasks.append((
+                "p8_intro",
+                self._p8_intro_usecase.execute(
+                    user_name=user_name, ilgan=ilgan,
+                    raw_months=raw_months,
+                    start_year=now.year, start_month=now.month,
+                ),
+            ))
+
         if not tasks:
             return
 
@@ -657,3 +683,5 @@ class CreatePaidReportUseCase:
                 response.p6_doyoon.ai_pattern = ai_text
             elif name == "p7_ending" and response.p7_doyoon is not None:
                 response.p7_doyoon.ai_ending = ai_text
+            elif name == "p8_intro" and response.p8_doyoon is not None:
+                response.p8_doyoon.ai_intro = ai_text

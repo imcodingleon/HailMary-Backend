@@ -74,6 +74,9 @@ from app.domains.ai.application.usecase.generate_p6_profile_usecase import (
 from app.domains.ai.application.usecase.generate_p7_ending_usecase import (
     GenerateP7EndingUseCase,
 )
+from app.domains.ai.application.usecase.generate_p8_intro_usecase import (
+    GenerateP8IntroUseCase,
+)
 from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
     GenerateP10LetterUseCase,
 )
@@ -251,6 +254,7 @@ def _make_confirm_payment_usecase(
     p6_meeting_usecase: GenerateP6MeetingUseCase | None = None
     p6_pattern_usecase: GenerateP6PatternUseCase | None = None
     p7_ending_usecase: GenerateP7EndingUseCase | None = None
+    p8_intro_usecase: GenerateP8IntroUseCase | None = None
     if _settings.claude_api_key:
         claude_client = ClaudeClient(
             api_key=_settings.claude_api_key,
@@ -274,6 +278,7 @@ def _make_confirm_payment_usecase(
         p6_meeting_usecase = GenerateP6MeetingUseCase(ai_client=claude_client)
         p6_pattern_usecase = GenerateP6PatternUseCase(ai_client=claude_client)
         p7_ending_usecase = GenerateP7EndingUseCase(ai_client=claude_client)
+        p8_intro_usecase = GenerateP8IntroUseCase(ai_client=claude_client)
     # SES 이메일 발송 (sender + IAM 키 있을 때만, 없으면 폴백)
     email_sender: SendResultLinkEmailUseCase | None = None
     if _settings.aws_ses_sender:
@@ -317,6 +322,7 @@ def _make_confirm_payment_usecase(
         p6_meeting_usecase=p6_meeting_usecase,
         p6_pattern_usecase=p6_pattern_usecase,
         p7_ending_usecase=p7_ending_usecase,
+        p8_intro_usecase=p8_intro_usecase,
         email_sender=email_sender,
         user_repo=user_repo,
     )

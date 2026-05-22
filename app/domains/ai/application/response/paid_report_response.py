@@ -645,6 +645,33 @@ class MonthRow(BaseModel):
     is_peak: bool = False
 
 
+# ═════════════════════════════════════════════════════════════════
+# P-8 도윤 패널 — 五 인연이 오는 시간
+# ═════════════════════════════════════════════════════════════════
+
+
+class MonthRowDoyoon(BaseModel):
+    """도윤 P-8 월 1개. 연우는 knot 사용, 도윤은 pct (% 표시)."""
+    model_config = ConfigDict(populate_by_name=True)
+    label: str
+    hearts: int           # 1~5
+    pct: int              # romanceScore
+    state: str
+    desc: str
+    is_peak: bool = False
+
+
+class PaidChapterP8Doyoon(BaseModel):
+    """P-8 도윤 패널 — 12개월 접촉 확률 타임라인."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_name: str
+    months: list[MonthRowDoyoon]   # 12
+    ai_intro: str
+    sd_avatar_asset: str           # "dy_04"
+    bubble: str
+
+
 class PaidChapterP8(BaseModel):
     """P-8 — 5-1 12개월 운명선."""
     model_config = ConfigDict(populate_by_name=True)
@@ -743,6 +770,7 @@ class PaidChaptersResponse(BaseModel):
     p6_doyoon: PaidChapterP6Doyoon | None = None
     p7: PaidChapterP7 | None = None
     p7_doyoon: PaidChapterP7Doyoon | None = None
+    p8_doyoon: PaidChapterP8Doyoon | None = None
     p8: PaidChapterP8 | None = None
     p9: PaidChapterP9 | None = None
     p10: PaidChapterP10 | None = None
