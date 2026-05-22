@@ -780,6 +780,9 @@ class PaidChapterP10(BaseModel):
     emphasis: str                     # 박스 3 강조구 (일간 10셀)
     tail: str                         # 박스 3 꼬리 (고정)
     uses_ai: bool                     # AI 호출 여부 (감사 로그용)
+    # 박스 1/2 사용자 선택 라벨 (도윤 패널에서 chip으로 표시. 연우는 None)
+    step1_labels: list[str] | None = None
+    step2_labels: list[str] | None = None
 
 
 # ═════════════════════════════════════════════════════════════════

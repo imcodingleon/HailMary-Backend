@@ -1201,6 +1201,14 @@ class ComposePaidReportUseCase:
             ai_letter_body=ai_letter_body,
         )
 
+        # step1/step2 라벨 (도윤 패널 chip 표시용 — 연우는 무시)
+        from app.domains.ai.domain.templates.doyoon_p10_box_letter import (
+            STEP1_LABEL,
+            STEP2_LABEL,
+        )
+        step1_labels = [STEP1_LABEL.get(s, s) for s in step1] if step1 else None
+        step2_labels = [STEP2_LABEL.get(s, s) for s in step2] if step2 else None
+
         return PaidChapterP10(
             ilju_with_hanja=ilju_with_hanja,
             box1_body=box1_body,
@@ -1211,6 +1219,8 @@ class ComposePaidReportUseCase:
             emphasis=cast(str, box3["emphasis"]),
             tail=cast(str, box3["tail"]),
             uses_ai=cast(bool, box3["uses_ai"]),
+            step1_labels=step1_labels,
+            step2_labels=step2_labels,
         )
 
     # ── 헬퍼: 악연 slotId 추출 ──────────────────────────────────

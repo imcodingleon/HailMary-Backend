@@ -86,6 +86,12 @@ from app.domains.ai.application.usecase.generate_p9_optimize_usecase import (
 from app.domains.ai.application.usecase.generate_p9_risk_usecase import (
     GenerateP9RiskUseCase,
 )
+from app.domains.ai.application.usecase.generate_p10_box1_usecase import (
+    GenerateP10Box1UseCase,
+)
+from app.domains.ai.application.usecase.generate_p10_box2_usecase import (
+    GenerateP10Box2UseCase,
+)
 from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
     GenerateP10LetterUseCase,
 )
@@ -267,6 +273,8 @@ def _make_confirm_payment_usecase(
     p9_ohang_usecase: GenerateP9OhangUseCase | None = None
     p9_risk_usecase: GenerateP9RiskUseCase | None = None
     p9_optimize_usecase: GenerateP9OptimizeUseCase | None = None
+    p10_box1_usecase: GenerateP10Box1UseCase | None = None
+    p10_box2_usecase: GenerateP10Box2UseCase | None = None
     if _settings.claude_api_key:
         claude_client = ClaudeClient(
             api_key=_settings.claude_api_key,
@@ -294,6 +302,8 @@ def _make_confirm_payment_usecase(
         p9_ohang_usecase = GenerateP9OhangUseCase(ai_client=claude_client)
         p9_risk_usecase = GenerateP9RiskUseCase(ai_client=claude_client)
         p9_optimize_usecase = GenerateP9OptimizeUseCase(ai_client=claude_client)
+        p10_box1_usecase = GenerateP10Box1UseCase(ai_client=claude_client)
+        p10_box2_usecase = GenerateP10Box2UseCase(ai_client=claude_client)
     # SES 이메일 발송 (sender + IAM 키 있을 때만, 없으면 폴백)
     email_sender: SendResultLinkEmailUseCase | None = None
     if _settings.aws_ses_sender:
@@ -341,6 +351,8 @@ def _make_confirm_payment_usecase(
         p9_ohang_usecase=p9_ohang_usecase,
         p9_risk_usecase=p9_risk_usecase,
         p9_optimize_usecase=p9_optimize_usecase,
+        p10_box1_usecase=p10_box1_usecase,
+        p10_box2_usecase=p10_box2_usecase,
         email_sender=email_sender,
         user_repo=user_repo,
     )

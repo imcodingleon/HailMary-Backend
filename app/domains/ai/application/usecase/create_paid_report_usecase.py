@@ -98,6 +98,12 @@ if TYPE_CHECKING:
     from app.domains.ai.application.usecase.generate_p9_risk_usecase import (
         GenerateP9RiskUseCase,
     )
+    from app.domains.ai.application.usecase.generate_p10_box1_usecase import (
+        GenerateP10Box1UseCase,
+    )
+    from app.domains.ai.application.usecase.generate_p10_box2_usecase import (
+        GenerateP10Box2UseCase,
+    )
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
     )
@@ -183,6 +189,8 @@ class CreatePaidReportUseCase:
         p9_ohang_usecase: GenerateP9OhangUseCase | None = None,
         p9_risk_usecase: GenerateP9RiskUseCase | None = None,
         p9_optimize_usecase: GenerateP9OptimizeUseCase | None = None,
+        p10_box1_usecase: GenerateP10Box1UseCase | None = None,
+        p10_box2_usecase: GenerateP10Box2UseCase | None = None,
         email_sender: SendResultLinkEmailUseCase | None = None,
         user_repo: UserRepository | None = None,
     ) -> None:
@@ -212,6 +220,8 @@ class CreatePaidReportUseCase:
         self._p9_ohang_usecase = p9_ohang_usecase
         self._p9_risk_usecase = p9_risk_usecase
         self._p9_optimize_usecase = p9_optimize_usecase
+        self._p10_box1_usecase = p10_box1_usecase
+        self._p10_box2_usecase = p10_box2_usecase
         self._email_sender = email_sender
         self._user_repo = user_repo
 
@@ -355,6 +365,8 @@ class CreatePaidReportUseCase:
                     ilgan=ilgan_dy,
                     excess=excess_dy,
                     lack=lack_dy,
+                    step1=step1,
+                    step2=step2,
                     saju_raw=saju_raw,
                     response=response,
                 )
@@ -413,6 +425,8 @@ class CreatePaidReportUseCase:
         ilgan: str,
         excess: str,
         lack: str,
+        step1: tuple[str, ...],
+        step2: tuple[str, ...],
         saju_raw: dict[str, Any],
         response: Any,
     ) -> None:
@@ -658,6 +672,32 @@ class CreatePaidReportUseCase:
                 self._p9_optimize_usecase.execute(user_name=user_name, ilgan=ilgan),
             ))
 
+        # P-10 box1 (step1 있을 때)
+        if (
+            self._p10_box1_usecase is not None
+            and response.p10 is not None
+            and step1
+        ):
+            tasks.append((
+                "p10_box1",
+                self._p10_box1_usecase.execute(
+                    user_name=user_name, ilgan=ilgan, step1=step1,
+                ),
+            ))
+
+        # P-10 box2 (step2 있을 때)
+        if (
+            self._p10_box2_usecase is not None
+            and response.p10 is not None
+            and step2
+        ):
+            tasks.append((
+                "p10_box2",
+                self._p10_box2_usecase.execute(
+                    user_name=user_name, ilgan=ilgan, step2=step2, ohang_lack=lack,
+                ),
+            ))
+
         # P-8 ai_intro (raw_months 재계산)
         if (
             self._p8_intro_usecase is not None
@@ -734,3 +774,7 @@ class CreatePaidReportUseCase:
                 response.p9_doyoon.ai_risk = ai_text
             elif name == "p9_optimize" and response.p9_doyoon is not None:
                 response.p9_doyoon.ai_optimize = ai_text
+            elif name == "p10_box1" and response.p10 is not None:
+                response.p10.box1_body = ai_text
+            elif name == "p10_box2" and response.p10 is not None:
+                response.p10.box2_body = ai_text
