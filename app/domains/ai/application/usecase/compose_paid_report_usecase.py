@@ -46,6 +46,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP6Doyoon,
     PaidChapterP7Doyoon,
     PaidChapterP8Doyoon,
+    PaidChapterP9Doyoon,
     PaidChapterP4,
     PaidChapterP5,
     PaidChapterP6,
@@ -90,6 +91,11 @@ from app.domains.ai.domain.templates.doyoon_p7_ending import (
 )
 from app.domains.ai.domain.templates.doyoon_p8_timing import (
     compose_doyoon_p8_timing,
+)
+from app.domains.ai.domain.templates.doyoon_p9_optimize import (
+    compose_doyoon_p9_ohang,
+    compose_doyoon_p9_optimize,
+    compose_doyoon_p9_risk,
 )
 from app.domains.ai.domain.templates.yeonwoo_p0_intro import compose_p0_intro
 from app.domains.ai.domain.templates.yeonwoo_p1_chapter_opening import (
@@ -282,6 +288,7 @@ class ComposePaidReportUseCase:
             p8_doyoon = self._build_p8_doyoon(
                 saju_raw, ilgan, start_year, start_month, user_name or ""
             )
+            p9_doyoon = self._build_p9_doyoon(ilgan, ohang_lack, user_name or "")
             p0_yeonwoo = None
             p1_yeonwoo = None
             p2_yeonwoo = None
@@ -298,6 +305,7 @@ class ComposePaidReportUseCase:
             p6_doyoon = None
             p7_doyoon = None
             p8_doyoon = None
+            p9_doyoon = None
             p0_yeonwoo = self._build_p0(vars_, ilgan, ohang_excess, ohang_lack)
             p1_yeonwoo = self._build_p1(ilgan, ilju)
             p2_yeonwoo = self._build_p2(ilgan)
@@ -321,6 +329,7 @@ class ComposePaidReportUseCase:
             p6_doyoon=p6_doyoon,
             p7_doyoon=p7_doyoon,
             p8_doyoon=p8_doyoon,
+            p9_doyoon=p9_doyoon,
             p6=p6,
             p7=self._build_p7(ilgan),
             p8=p8,
@@ -473,6 +482,60 @@ class ComposePaidReportUseCase:
                 user_name=user_name, ilgan=ilgan
             ),
             bubble_quote="이거 알고 계신 것만으로도 달라져요. 진짜로요.",
+        )
+
+    # ── P-9 (도윤 패널) ──────────────────────────────────────
+    def _build_p9_doyoon(
+        self, ilgan: str, ohang_lack: str, user_name: str,
+    ) -> PaidChapterP9Doyoon | None:
+        """도윤 P-9 합성 — 오행 보완 + 리스크 제거 + 매력 최적화."""
+        try:
+            from app.domains.ai.application.response.paid_report_response import (
+                OhangMethodCardDoyoon,
+                RiskCardDoyoon,
+            )
+            from app.domains.ai.domain.value_object.doyoon_p9_data import (
+                DOYOON_P9_DATA,
+                OHANG_BOOST_PCT,
+                RISK_CARDS,
+                get_ohang_methods,
+            )
+
+            ai_ohang = compose_doyoon_p9_ohang(
+                user_name=user_name, ilgan=ilgan, ohang_lack=ohang_lack
+            )
+            ai_risk = compose_doyoon_p9_risk(user_name=user_name, ilgan=ilgan)
+            ai_optimize = compose_doyoon_p9_optimize(user_name=user_name, ilgan=ilgan)
+            methods = get_ohang_methods(ohang_lack)
+            d = DOYOON_P9_DATA[ilgan]
+        except (KeyError, ValueError):
+            return None
+
+        from app.domains.ai.domain.templates.doyoon_p0_intro import OHANG_HANJA
+        ohang_with_hanja = f"{ohang_lack}({OHANG_HANJA.get(ohang_lack, ohang_lack)})"
+
+        return PaidChapterP9Doyoon(
+            user_name=user_name,
+            ohang_lack=ohang_with_hanja,
+            ohang_methods=[
+                OhangMethodCardDoyoon(label=m.label, keyword=m.keyword, desc=m.desc)
+                for m in methods
+            ],
+            ohang_boost_pct=OHANG_BOOST_PCT,
+            ai_ohang=ai_ohang,
+            risk_cards=[
+                RiskCardDoyoon(
+                    label=r.label, tone=r.tone,  # type: ignore[arg-type]
+                    keyword=r.keyword, desc=r.desc,
+                )
+                for r in RISK_CARDS
+            ],
+            ai_risk=ai_risk,
+            current_score=d.current_score,
+            target_score=d.target_score,
+            ai_optimize=ai_optimize,
+            sd_avatar_asset=d.sd_optimize_asset,
+            optimize_bubble=d.optimize_bubble.replace("{USER_NAME}", user_name),
         )
 
     # ── P-8 (도윤 패널) ──────────────────────────────────────

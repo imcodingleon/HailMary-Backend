@@ -707,6 +707,47 @@ class CharmPracticeCard(BaseModel):
 CharmStageLiteral = Literal["微", "弱", "中", "強", "極"]
 
 
+# ═════════════════════════════════════════════════════════════════
+# P-9 도윤 패널 — 六 연애 변수 최적화 가이드
+# ═════════════════════════════════════════════════════════════════
+
+
+class OhangMethodCardDoyoon(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    label: str
+    keyword: str
+    desc: str
+
+
+class RiskCardDoyoon(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    label: str
+    tone: Literal["warn", "amber"]
+    keyword: str
+    desc: str
+
+
+class PaidChapterP9Doyoon(BaseModel):
+    """P-9 도윤 패널 — 오행 보완 + 리스크 제거 + 매력 최적화."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    user_name: str
+    # 6-1
+    ohang_lack: str                                 # "수(水)" 한자 포함
+    ohang_methods: list[OhangMethodCardDoyoon]      # 3
+    ohang_boost_pct: str                            # "23%"
+    ai_ohang: str
+    # 6-2
+    risk_cards: list[RiskCardDoyoon]                # 3
+    ai_risk: str
+    # 6-3
+    current_score: int
+    target_score: int
+    ai_optimize: str
+    sd_avatar_asset: str                            # "dy_06"
+    optimize_bubble: str
+
+
 class PaidChapterP9(BaseModel):
     """P-9 — 6-1 오행 보완 + 6-2 매력살 활용."""
     model_config = ConfigDict(populate_by_name=True)
@@ -771,6 +812,7 @@ class PaidChaptersResponse(BaseModel):
     p7: PaidChapterP7 | None = None
     p7_doyoon: PaidChapterP7Doyoon | None = None
     p8_doyoon: PaidChapterP8Doyoon | None = None
+    p9_doyoon: PaidChapterP9Doyoon | None = None
     p8: PaidChapterP8 | None = None
     p9: PaidChapterP9 | None = None
     p10: PaidChapterP10 | None = None

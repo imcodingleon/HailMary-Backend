@@ -89,6 +89,15 @@ if TYPE_CHECKING:
     from app.domains.ai.application.usecase.generate_p8_intro_usecase import (
         GenerateP8IntroUseCase,
     )
+    from app.domains.ai.application.usecase.generate_p9_ohang_usecase import (
+        GenerateP9OhangUseCase,
+    )
+    from app.domains.ai.application.usecase.generate_p9_optimize_usecase import (
+        GenerateP9OptimizeUseCase,
+    )
+    from app.domains.ai.application.usecase.generate_p9_risk_usecase import (
+        GenerateP9RiskUseCase,
+    )
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
     )
@@ -171,6 +180,9 @@ class CreatePaidReportUseCase:
         p6_pattern_usecase: GenerateP6PatternUseCase | None = None,
         p7_ending_usecase: GenerateP7EndingUseCase | None = None,
         p8_intro_usecase: GenerateP8IntroUseCase | None = None,
+        p9_ohang_usecase: GenerateP9OhangUseCase | None = None,
+        p9_risk_usecase: GenerateP9RiskUseCase | None = None,
+        p9_optimize_usecase: GenerateP9OptimizeUseCase | None = None,
         email_sender: SendResultLinkEmailUseCase | None = None,
         user_repo: UserRepository | None = None,
     ) -> None:
@@ -197,6 +209,9 @@ class CreatePaidReportUseCase:
         self._p6_pattern_usecase = p6_pattern_usecase
         self._p7_ending_usecase = p7_ending_usecase
         self._p8_intro_usecase = p8_intro_usecase
+        self._p9_ohang_usecase = p9_ohang_usecase
+        self._p9_risk_usecase = p9_risk_usecase
+        self._p9_optimize_usecase = p9_optimize_usecase
         self._email_sender = email_sender
         self._user_repo = user_repo
 
@@ -615,6 +630,34 @@ class CreatePaidReportUseCase:
                 self._p7_ending_usecase.execute(user_name=user_name, ilgan=ilgan),
             ))
 
+        # P-9 ai_ohang / ai_risk / ai_optimize
+        if (
+            self._p9_ohang_usecase is not None
+            and response.p9_doyoon is not None
+        ):
+            tasks.append((
+                "p9_ohang",
+                self._p9_ohang_usecase.execute(
+                    user_name=user_name, ilgan=ilgan, ohang_lack=lack
+                ),
+            ))
+        if (
+            self._p9_risk_usecase is not None
+            and response.p9_doyoon is not None
+        ):
+            tasks.append((
+                "p9_risk",
+                self._p9_risk_usecase.execute(user_name=user_name, ilgan=ilgan),
+            ))
+        if (
+            self._p9_optimize_usecase is not None
+            and response.p9_doyoon is not None
+        ):
+            tasks.append((
+                "p9_optimize",
+                self._p9_optimize_usecase.execute(user_name=user_name, ilgan=ilgan),
+            ))
+
         # P-8 ai_intro (raw_months 재계산)
         if (
             self._p8_intro_usecase is not None
@@ -685,3 +728,9 @@ class CreatePaidReportUseCase:
                 response.p7_doyoon.ai_ending = ai_text
             elif name == "p8_intro" and response.p8_doyoon is not None:
                 response.p8_doyoon.ai_intro = ai_text
+            elif name == "p9_ohang" and response.p9_doyoon is not None:
+                response.p9_doyoon.ai_ohang = ai_text
+            elif name == "p9_risk" and response.p9_doyoon is not None:
+                response.p9_doyoon.ai_risk = ai_text
+            elif name == "p9_optimize" and response.p9_doyoon is not None:
+                response.p9_doyoon.ai_optimize = ai_text
