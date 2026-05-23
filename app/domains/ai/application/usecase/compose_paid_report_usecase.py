@@ -47,6 +47,7 @@ from app.domains.ai.application.response.paid_report_response import (
     PaidChapterP7Doyoon,
     PaidChapterP8Doyoon,
     PaidChapterP9Doyoon,
+    PaidChapterP11Doyoon,
     PaidChapterP4,
     PaidChapterP5,
     PaidChapterP6,
@@ -289,6 +290,7 @@ class ComposePaidReportUseCase:
                 saju_raw, ilgan, start_year, start_month, user_name or ""
             )
             p9_doyoon = self._build_p9_doyoon(ilgan, ohang_lack, user_name or "")
+            p11_doyoon = self._build_p11_doyoon(user_name or "")
             p0_yeonwoo = None
             p1_yeonwoo = None
             p2_yeonwoo = None
@@ -306,6 +308,7 @@ class ComposePaidReportUseCase:
             p7_doyoon = None
             p8_doyoon = None
             p9_doyoon = None
+            p11_doyoon = None
             p0_yeonwoo = self._build_p0(vars_, ilgan, ohang_excess, ohang_lack)
             p1_yeonwoo = self._build_p1(ilgan, ilju)
             p2_yeonwoo = self._build_p2(ilgan)
@@ -330,6 +333,7 @@ class ComposePaidReportUseCase:
             p7_doyoon=p7_doyoon,
             p8_doyoon=p8_doyoon,
             p9_doyoon=p9_doyoon,
+            p11_doyoon=p11_doyoon,
             p6=p6,
             p7=self._build_p7(ilgan),
             p8=p8,
@@ -482,6 +486,25 @@ class ComposePaidReportUseCase:
                 user_name=user_name, ilgan=ilgan
             ),
             bubble_quote="이거 알고 계신 것만으로도 달라져요. 진짜로요.",
+        )
+
+    # ── P-11 (도윤 패널) ─────────────────────────────────────
+    def _build_p11_doyoon(self, user_name: str) -> PaidChapterP11Doyoon | None:
+        """도윤 P-11 에필로그 — 고정 텍스트 + user_name 치환.
+
+        AI 호출 없음. 룰 합성만. user_name이 빈 문자열이어도 안전 (그 자리 빈 채로).
+        """
+        if not user_name:
+            user_name = "당신"
+        closing_bubble = (
+            f"다 읽으셨나요? 데이터가 할 수 있는 말은 여기까지입니다.\n"
+            f"이제부터는 {user_name}님의 선택이라는 변수가 결과값을 결정하겠죠.\n"
+            f"데이터상으로 {user_name}님의 조합은 오차 범위를 감안해도 기대값이 굉장히 높게 측정됩니다.\n"
+            f"스스로를 의심하지 마세요. {user_name}님은 이미 가장 완벽한 답안지를 갖고 계시니까요."
+        )
+        return PaidChapterP11Doyoon(
+            closing_bubble=closing_bubble,
+            seal_text="緣 · 당신의 인연은 여기에",
         )
 
     # ── P-9 (도윤 패널) ──────────────────────────────────────

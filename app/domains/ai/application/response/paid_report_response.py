@@ -786,6 +786,23 @@ class PaidChapterP10(BaseModel):
 
 
 # ═════════════════════════════════════════════════════════════════
+# P-11 도윤 패널 — 終 에필로그 (고정 + user_name 치환)
+# ═════════════════════════════════════════════════════════════════
+
+
+class PaidChapterP11Doyoon(BaseModel):
+    """P-11 에필로그 — 클로징 bubble (user_name 치환된 텍스트).
+
+    원본 도윤_final.html data-page-idx=11 고정 멘트.
+    프론트는 closing_bubble을 그대로 렌더 (자체 마스킹 X).
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    closing_bubble: str             # 한도윤 마지막 4줄 (user_name 치환 완료)
+    seal_text: str                  # "緣 · 당신의 인연은 여기에"
+
+
+# ═════════════════════════════════════════════════════════════════
 # Chapters wrapper + Top-level response
 # ═════════════════════════════════════════════════════════════════
 
@@ -819,6 +836,7 @@ class PaidChaptersResponse(BaseModel):
     p8: PaidChapterP8 | None = None
     p9: PaidChapterP9 | None = None
     p10: PaidChapterP10 | None = None
+    p11_doyoon: PaidChapterP11Doyoon | None = None
     # P-11 후속
 
 
