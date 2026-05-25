@@ -672,6 +672,13 @@ class CreatePaidReportUseCase:
                 self._p9_optimize_usecase.execute(user_name=user_name, ilgan=ilgan),
             ))
 
+        # P-8 peak_labels — box1/box2의 timing/waiting_new 슬러그 답 데이터에 사용
+        peak_labels_for_box: tuple[str, str] | None = None
+        if response.p8_doyoon is not None and response.p8_doyoon.months:
+            _peaks = [m.label for m in response.p8_doyoon.months if m.is_peak]
+            if len(_peaks) >= 2:
+                peak_labels_for_box = (_peaks[0], _peaks[1])
+
         # P-10 box1 (step1 있을 때)
         if (
             self._p10_box1_usecase is not None
@@ -682,6 +689,7 @@ class CreatePaidReportUseCase:
                 "p10_box1",
                 self._p10_box1_usecase.execute(
                     user_name=user_name, ilgan=ilgan, step1=step1,
+                    peak_labels=peak_labels_for_box,
                 ),
             ))
 
@@ -695,6 +703,7 @@ class CreatePaidReportUseCase:
                 "p10_box2",
                 self._p10_box2_usecase.execute(
                     user_name=user_name, ilgan=ilgan, step2=step2, ohang_lack=lack,
+                    peak_labels=peak_labels_for_box,
                 ),
             ))
 

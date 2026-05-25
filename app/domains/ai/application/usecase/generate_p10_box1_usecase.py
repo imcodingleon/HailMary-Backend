@@ -15,7 +15,8 @@ from app.domains.ai.domain.templates.doyoon_p10_box_letter import (
 
 logger = logging.getLogger(__name__)
 DOYOON_P10_MODEL = "claude-sonnet-4-6"
-_MAX_TOKENS = 500
+# 옵션 수 따라 동적 토큰. 4 옵션 시 ~900자 보존 위해 max 1500 토큰.
+_MAX_TOKENS = 1500
 _TEMPERATURE = 0.85
 
 
@@ -28,9 +29,16 @@ class GenerateP10Box1UseCase:
         self._ai_client = ai_client
 
     async def execute(
-        self, *, user_name: str, ilgan: str, step1: tuple[str, ...]
+        self,
+        *,
+        user_name: str,
+        ilgan: str,
+        step1: tuple[str, ...],
+        peak_labels: tuple[str, str] | None = None,
     ) -> str:
-        facts = get_doyoon_box1_facts(user_name=user_name, ilgan=ilgan, step1=step1)
+        facts = get_doyoon_box1_facts(
+            user_name=user_name, ilgan=ilgan, step1=step1, peak_labels=peak_labels
+        )
         rule_fallback: str = facts["rule_text"]
         try:
             system, user = build_p10_box1_prompt(facts)

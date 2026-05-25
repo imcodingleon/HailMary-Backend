@@ -1590,6 +1590,31 @@ BOX3_TAIL: str = (
 
 
 # ═════════════════════════════════════════════════════════════════
+# 도윤 P-10 box3 emphasis + tail (character 분기용)
+# ═════════════════════════════════════════════════════════════════
+# 원본 도윤_final.html line 강조구 + 클로징 — 존댓말 + 데이터/분석 톤.
+# user_name은 compose_box3에서 치환.
+
+DOYOON_EMPHASIS_BY_ILGAN: dict[str, str] = {
+    "갑목": "{user_name}님은 곧은 결단력으로 답을 이미 알고 계세요.",
+    "을목": "{user_name}님은 유연한 적응력으로 길을 이미 알고 계세요.",
+    "병화": "{user_name}님은 빛나는 발산력으로 답을 이미 갖고 계세요.",
+    "정화": "{user_name}님은 잔잔한 깊이로 답을 이미 알고 계세요.",
+    "무토": "{user_name}님은 묵직한 안정성으로 답을 이미 갖고 계세요.",
+    "기토": "{user_name}님은 다정한 배려로 답을 이미 알고 계세요.",
+    "경금": "{user_name}님은 명확한 판단력으로 답을 이미 갖고 계세요.",
+    "신금": "{user_name}님은 섬세한 감각으로 답을 이미 알고 계세요.",
+    "임수": "{user_name}님은 이미 가장 완벽한 답안지를 갖고 계세요.",
+    "계수": "{user_name}님은 깊은 잠재력으로 답을 이미 알고 계세요.",
+}
+
+DOYOON_BOX3_TAIL: str = (
+    "스스로를 의심하지 마시고, 데이터를 믿어보세요.\n"
+    "오늘 밤은 편하게 주무셨으면 좋겠네요."
+)
+
+
+# ═════════════════════════════════════════════════════════════════
 # 박스 3 합성 함수
 # ═════════════════════════════════════════════════════════════════
 
@@ -1599,6 +1624,8 @@ def compose_box3(
     step3: str | None,
     step1: tuple[str, ...] = (),
     ai_letter_body: str | None = None,
+    character: str = "yeonwoo",
+    user_name: str = "",
 ) -> dict[str, object]:
     """박스 3 풀 합성.
 
@@ -1607,6 +1634,8 @@ def compose_box3(
         step3: 사용자 자유 텍스트. None/빈 문자열이면 폴백.
         step1: step1 슬러그 튜플. step3 비었을 때 폴백 본문 1순위 픽에 사용.
         ai_letter_body: AI 호출 결과 (step3 있을 때만 사용). None이면 폴백.
+        character: "yeonwoo" 또는 "doyoon". 도윤 시 emphasis/tail 별도 매트릭스.
+        user_name: 도윤 emphasis에서 {user_name} 치환에 사용.
 
     Returns:
         {
@@ -1642,11 +1671,14 @@ def compose_box3(
         body = f"{BOX3_FALLBACK_INTRO}\n\n{fallback_body}\n\n{BOX3_FALLBACK_OUTRO}"
         uses_ai = False
 
-    # ③ 강조구
-    emphasis = EMPHASIS_BY_ILGAN[ilgan]
-
-    # ④ 꼬리 (고정)
-    tail = BOX3_TAIL
+    # ③ 강조구 + ④ 꼬리 — character 분기
+    if character == "doyoon":
+        name_for_emphasis = user_name or "당신"
+        emphasis = DOYOON_EMPHASIS_BY_ILGAN[ilgan].replace("{user_name}", name_for_emphasis)
+        tail = DOYOON_BOX3_TAIL
+    else:
+        emphasis = EMPHASIS_BY_ILGAN[ilgan]
+        tail = BOX3_TAIL
 
     return {
         "quote_text": quote_text,

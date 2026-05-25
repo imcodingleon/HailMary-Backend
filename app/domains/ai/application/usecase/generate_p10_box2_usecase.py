@@ -15,7 +15,7 @@ from app.domains.ai.domain.templates.doyoon_p10_box_letter import (
 
 logger = logging.getLogger(__name__)
 DOYOON_P10_MODEL = "claude-sonnet-4-6"
-_MAX_TOKENS = 600
+_MAX_TOKENS = 1500
 _TEMPERATURE = 0.85
 
 
@@ -28,10 +28,17 @@ class GenerateP10Box2UseCase:
         self._ai_client = ai_client
 
     async def execute(
-        self, *, user_name: str, ilgan: str, step2: tuple[str, ...], ohang_lack: str,
+        self,
+        *,
+        user_name: str,
+        ilgan: str,
+        step2: tuple[str, ...],
+        ohang_lack: str,
+        peak_labels: tuple[str, str] | None = None,
     ) -> str:
         facts = get_doyoon_box2_facts(
-            user_name=user_name, ilgan=ilgan, step2=step2, ohang_lack=ohang_lack
+            user_name=user_name, ilgan=ilgan, step2=step2,
+            ohang_lack=ohang_lack, peak_labels=peak_labels,
         )
         rule_fallback: str = facts["rule_text"]
         try:

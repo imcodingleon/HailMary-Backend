@@ -347,6 +347,8 @@ class ComposePaidReportUseCase:
                 p6=p6,
                 p8=p8,
                 ai_letter_body=ai_letter_body,
+                character=character,
+                user_name=user_name or "",
             ),
         )
 
@@ -1183,6 +1185,8 @@ class ComposePaidReportUseCase:
         p6: PaidChapterP6 | None,
         p8: PaidChapterP8 | None,
         ai_letter_body: str | None,
+        character: str = "yeonwoo",
+        user_name: str = "",
     ) -> PaidChapterP10 | None:
         """P-10 편지 합성 — 박스 1·2·3 통합.
 
@@ -1216,12 +1220,15 @@ class ComposePaidReportUseCase:
         )
 
         # 박스 3: step3 + AI 결과 또는 폴백
+        # character/user_name 전달 — 도윤일 때 emphasis/tail 별도 매트릭스 사용
         ilju_with_hanja = _ilju_with_hanja(ilju)
         box3 = compose_box3(
             ilgan=ilgan,
             step3=step3,
             step1=step1,
             ai_letter_body=ai_letter_body,
+            character=character,
+            user_name=user_name,
         )
 
         # step1/step2 라벨 (도윤 패널 chip 표시용 — 연우는 무시)
