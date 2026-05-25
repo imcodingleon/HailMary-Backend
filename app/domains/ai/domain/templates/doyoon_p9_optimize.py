@@ -26,31 +26,38 @@ def _validate(user_name: str, ilgan: str) -> None:
 
 
 def compose_doyoon_p9_ohang(*, user_name: str, ilgan: str, ohang_lack: str) -> str:
-    """6-1 오행 보완 ai_ohang 합성 (250~300자, 3단락)."""
+    """6-1 오행 보완 ai_ohang 합성 — 카드 풀이 톤.
+
+    별도 메타 수치 (반응성 배수·최대 부스트) 인용 X. 카드 라벨 (9%+7%+7%=23%)만 풀이.
+    """
     _validate(user_name, ilgan)
     ilgan_hanja = ILGAN_HANJA[ilgan]
     lack_hanja = OHANG_HANJA.get(ohang_lack, ohang_lack)
 
     return (
-        f"{ilgan}({ilgan_hanja}) 일간은 {ohang_lack}({lack_hanja}) 보완에 유독 민감하게 반응해요. "
-        f"동일 일간 표본에서 보완 적용 전후 인연 접촉률이 평균 {OHANG_BOOST_PCT} 차이가 나요. "
-        f"일반 케이스보다 {OHANG_RESPONSE_MULTIPLIER} 높은 반응성이에요.\n\n"
-        "세 가지를 30일간 유지하시면 효과가 누적돼요. 단순 합산이 아니라 상호작용 효과까지 포함하면 "
-        f"최대 {OHANG_MAX_BOOST_PCT}까지 올라가요. 그냥 생활 패턴 조금 바꾸는 것뿐인데 꽤 큰 변화예요.\n\n"
-        f"뭐부터 할지 모르겠으면 제일 가벼운 것부터 시작하세요. {user_name}님께 가장 진입 장벽이 낮은 색채 노출부터 권장드려요."
+        f"{ilgan}({ilgan_hanja}) 일간 {user_name}님께 {ohang_lack}({lack_hanja}) 보완 효과를 카드로 정리해드렸어요. "
+        f"세 가지 방법의 효과를 합하면 평균 {OHANG_BOOST_PCT} 인연 접촉 확률이 올라가요.\n\n"
+        "보완 방법 1(+9%) 색채 노출이 가장 진입 장벽이 낮아요. 옷차림 비율 늘리시는 정도로도 시작 가능해요. "
+        "방법 2(+7%) 공간 변수와 방법 3(+7%) 행동 변수는 누적 시간이 필요한 변수예요.\n\n"
+        f"세 가지를 30일간 유지하시면 23% 효과가 안정적으로 잡혀요. "
+        f"{user_name}님께 우선순위는 효과 +9%인 색채 노출부터 권장드려요."
     )
 
 
 def compose_doyoon_p9_risk(*, user_name: str, ilgan: str) -> str:
-    """6-2 리스크 제거 ai_risk 합성 (200~250자, 2단락)."""
+    """6-2 리스크 제거 ai_risk 합성 — 카드 풀이 톤.
+
+    별도 메타 수치 (36% 임팩트) 인용 X. 카드 라벨 (81%·64%·47% = 192)과
+    실제 합산 수렴 (1.4배 → 130) 패턴만 풀이.
+    """
     _validate(user_name, ilgan)
     return (
-        "세 개 중에 즉시 변수가 임팩트가 가장 커요. "
-        f"이것 하나만 정리해도 새 인연 진입률이 {IMMEDIATE_IMPACT_PCT} 올라가거든요. "
-        "단기랑 중기는 차차 하셔도 되는데, 즉시는 말 그대로 지금 바로예요.\n\n"
-        f"{user_name}님께서 동시에 셋 다 진행하시면 좋긴 한데, 효과가 단순 합산이 아니라 "
-        f"{COMBINED_EFFECT_MULTIPLIER} 수준으로 수렴해요. 즉 81+64+47 = 192가 아니라 약 {COMBINED_EFFECT_VALUE} 수준이에요. "
-        "그래도 충분히 의미 있는 수치예요. 다만 우선순위는 분명히 잡고 가시는 게 효율적이에요."
+        "리스크 카드 세 장 정리해드렸어요. 즉시 변수 81%가 가장 위험도 높고, 단기 64%, 중기 47% 순서예요. "
+        "위험도 라벨 자체가 우선순위를 그대로 가리켜요.\n\n"
+        f"{user_name}님께서 셋 다 진행하실 때 단순 합산은 81+64+47 = 192로 잡혀요. "
+        f"하지만 실제는 변수 간 상호작용 효과로 {COMBINED_EFFECT_MULTIPLIER} 수준으로 수렴해 약 {COMBINED_EFFECT_VALUE} 정도가 측정값이에요. "
+        "192라는 단순 합산을 그대로 받지 마시고, 130이 실제 임팩트라고 보시면 됩니다.\n\n"
+        "다만 즉시(81%)부터 우선 처리하시는 게 효율적이에요. 위험도 라벨이 그 자체로 진행 순서를 가리키니까요."
     )
 
 
@@ -75,6 +82,11 @@ def compose_doyoon_p9_optimize(*, user_name: str, ilgan: str) -> str:
 
 
 def get_doyoon_p9_ohang_facts(*, user_name: str, ilgan: str, ohang_lack: str) -> dict[str, str]:
+    """6-1 facts — *카드에 표시되는 사실값만* prompt에 노출.
+
+    응답성 배수 (1.6배) / 최대 부스트 (28%) 같은 별도 메타 수치는 제외 —
+    사용자가 표에서 확인할 수 없어 hallucination처럼 보임.
+    """
     _validate(user_name, ilgan)
     rule_text = compose_doyoon_p9_ohang(user_name=user_name, ilgan=ilgan, ohang_lack=ohang_lack)
     return {
@@ -83,22 +95,24 @@ def get_doyoon_p9_ohang_facts(*, user_name: str, ilgan: str, ohang_lack: str) ->
         "ilgan_hanja": ILGAN_HANJA[ilgan],
         "ohang_lack": ohang_lack,
         "ohang_lack_hanja": OHANG_HANJA.get(ohang_lack, ohang_lack),
-        "boost_pct": OHANG_BOOST_PCT,
-        "response_multiplier": OHANG_RESPONSE_MULTIPLIER,
-        "max_boost_pct": OHANG_MAX_BOOST_PCT,
+        "boost_pct": OHANG_BOOST_PCT,    # 카드 합산 (9+7+7)
         "rule_text": rule_text,
     }
 
 
 def get_doyoon_p9_risk_facts(*, user_name: str, ilgan: str) -> dict[str, str]:
+    """6-2 facts — *카드에 표시되는 사실값 + 합산 패턴만* prompt에 노출.
+
+    즉시 변수 단독 임팩트 (36%) 같은 별도 메타 수치는 제외.
+    192 (단순 합산) / 130 (1.4배 수렴)은 카드 라벨로부터 유도 가능해서 유지.
+    """
     _validate(user_name, ilgan)
     rule_text = compose_doyoon_p9_risk(user_name=user_name, ilgan=ilgan)
     return {
         "user_name": user_name,
         "ilgan_full": ilgan,
-        "immediate_impact_pct": IMMEDIATE_IMPACT_PCT,
-        "combined_multiplier": COMBINED_EFFECT_MULTIPLIER,
-        "combined_value": COMBINED_EFFECT_VALUE,
+        "combined_multiplier": COMBINED_EFFECT_MULTIPLIER,   # 1.4배
+        "combined_value": COMBINED_EFFECT_VALUE,             # 130
         "rule_text": rule_text,
     }
 

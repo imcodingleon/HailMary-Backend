@@ -70,9 +70,11 @@ def test_compose_ohang_all_ilgan() -> None:
 
 
 def test_compose_risk_all_ilgan() -> None:
+    """카드 풀이 톤 — 81% (즉시 위험도) + 130 (실제 임팩트) 포함."""
     for ilgan in VALID_DOYOON_P9_ILGAN:
         text = compose_doyoon_p9_risk(user_name="홍길동", ilgan=ilgan)
-        assert "36%" in text
+        assert "81%" in text
+        assert "130" in text
 
 
 def test_compose_optimize_all_ilgan() -> None:
@@ -85,13 +87,15 @@ def test_compose_optimize_all_ilgan() -> None:
 
 
 def _ohang_valid(facts):
+    """카드 풀이 톤 — 카드 라벨 (9%/7%/7%/23%)만 인용. 별도 메타 수치 X."""
     return (
-        f"{facts['ilgan_full']}({facts['ilgan_hanja']}) 일간은 {facts['ohang_lack']}({facts['ohang_lack_hanja']}) "
-        f"보완에 유독 민감하게 반응해요. 보완 적용 전후 인연 접촉률이 평균 {facts['boost_pct']} 차이가 납니다. "
-        f"일반 케이스보다 {facts['response_multiplier']} 높은 반응성으로 측정돼요.\n\n"
-        f"세 가지를 30일간 유지하시면 누적 효과가 강하게 나타나요. 상호작용 효과까지 포함하면 "
-        f"최대 {facts['max_boost_pct']}까지 부스트됩니다.\n\n"
-        f"{facts['user_name']}님께서는 가벼운 것부터 시작하시면 됩니다. 색채 노출이 가장 진입 장벽 낮아요."
+        f"{facts['ilgan_full']}({facts['ilgan_hanja']}) 일간 {facts['user_name']}님께 "
+        f"{facts['ohang_lack']}({facts['ohang_lack_hanja']}) 보완 효과를 카드로 정리해드렸어요. "
+        f"세 가지 방법 합산 평균 {facts['boost_pct']} 인연 접촉 확률 상승.\n\n"
+        "보완 방법 1 (+9%) 색채 노출이 가장 진입 장벽 낮습니다. 옷차림부터 시작 가능. "
+        "방법 2 (+7%) 공간 변수와 방법 3 (+7%) 행동 변수는 누적 시간 필요.\n\n"
+        f"세 가지 30일 유지 시 {facts['boost_pct']} 효과 안정. "
+        f"{facts['user_name']}님께 효과 +9% 색채 노출부터 권장합니다."
     )
 
 
@@ -103,22 +107,29 @@ def test_ohang_validate() -> None:
 
 @pytest.mark.asyncio
 async def test_ohang_usecase_falls_back() -> None:
+    """fallback 시 카드 합산 23% + 카드 라벨 풀이."""
     fake = _FakeAIClient(raise_exc=AIClientError("x"))
     out = await GenerateP9OhangUseCase(ai_client=fake).execute(
         user_name="홍길동", ilgan="임수", ohang_lack="화"
     )
     assert "23%" in out
+    assert "+9%" in out  # 카드 라벨 풀이 확인
+    # 카드에 없는 별도 수치는 룰 텍스트에도 없어야
+    assert "28%" not in out
+    assert "1.6배" not in out
 
 
 # ── RISK ────────────────────────────────────────────────────
 
 
 def _risk_valid(facts):
+    """카드 풀이 톤 — 81%/64%/47% 카드 라벨 + 192·130 합산 패턴만."""
     return (
-        f"세 개 중에 즉시 변수가 임팩트가 가장 큽니다. 이것 하나만 정리해도 새 인연 진입률이 "
-        f"{facts['immediate_impact_pct']} 올라가요. 단기·중기는 차차 진행 가능합니다.\n\n"
-        f"{facts['user_name']}님이 동시에 셋 다 진행하시면 효과가 합산이 아닌 {facts['combined_multiplier']} 수준으로 수렴해요. "
-        f"즉 192가 아니라 약 {facts['combined_value']} 수준입니다. 우선순위 명확화가 효율적이에요."
+        "리스크 카드 세 장 정리해드렸어요. 즉시 81%·단기 64%·중기 47% 위험도가 그대로 우선순위. "
+        "라벨 자체가 진행 순서를 가리킵니다.\n\n"
+        f"{facts['user_name']}님이 셋 다 진행하시면 단순 합산 192가 아니라 "
+        f"{facts['combined_multiplier']} 수준으로 수렴해 약 {facts['combined_value']}가 실제 임팩트입니다. "
+        "즉시(81%)부터 우선 처리하시는 게 효율적이에요."
     )
 
 
@@ -130,9 +141,12 @@ def test_risk_validate() -> None:
 
 @pytest.mark.asyncio
 async def test_risk_usecase_falls_back() -> None:
+    """fallback 시 카드 라벨 (81%) + 합산 패턴 (130). 36% 같은 별도 수치 X."""
     fake = _FakeAIClient(raise_exc=AIClientError("x"))
     out = await GenerateP9RiskUseCase(ai_client=fake).execute(user_name="홍길동", ilgan="임수")
-    assert "36%" in out
+    assert "81%" in out
+    assert "130" in out
+    assert "36%" not in out  # 카드에 없는 별도 수치 X
 
 
 # ── OPTIMIZE ───────────────────────────────────────────────
