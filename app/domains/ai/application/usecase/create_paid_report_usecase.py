@@ -107,6 +107,9 @@ if TYPE_CHECKING:
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
     )
+    from app.domains.ai.application.usecase.determine_doyoon_name_address_usecase import (
+        DetermineDoyoonNameAddressUseCase,
+    )
     from app.domains.ai.application.usecase.send_result_link_email_usecase import (
         SendResultLinkEmailUseCase,
     )
@@ -168,6 +171,7 @@ class CreatePaidReportUseCase:
         survey_repo: SurveyRepository | None = None,
         compose_usecase: ComposePaidReportUseCase | None = None,
         p10_letter_usecase: GenerateP10LetterUseCase | None = None,
+        determine_name_address_usecase: DetermineDoyoonNameAddressUseCase | None = None,
         p0_diagnosis_usecase: GenerateP0DiagnosisUseCase | None = None,
         p1_opening_usecase: GenerateP1OpeningUseCase | None = None,
         p1_trigger_usecase: GenerateP1TriggerUseCase | None = None,
@@ -199,6 +203,7 @@ class CreatePaidReportUseCase:
         self._survey_repo = survey_repo
         self._compose_usecase = compose_usecase
         self._p10_letter_usecase = p10_letter_usecase
+        self._determine_name_address_usecase = determine_name_address_usecase
         self._p0_diagnosis_usecase = p0_diagnosis_usecase
         self._p1_opening_usecase = p1_opening_usecase
         self._p1_trigger_usecase = p1_trigger_usecase
@@ -336,8 +341,18 @@ class CreatePaidReportUseCase:
                     "doyoon p0 wanted user_name but user not found, user_id=%s",
                     user_id,
                 )
-                # 도윤이지만 user 없으면 합성 자체 불가 → 연우 fallback
-                # (실제 운영에선 거의 불가능 — Payment.user_id가 결제 시 박혀 있음)
+
+        # 도윤 호명용 이름 사전 분류 (Sonnet 4.6, 1회).
+        # 실명("배성현") → "성현" / 닉네임·외래어("곰돌이푸"/"John") → 그대로.
+        # AI 실패 시 풀네임 fallback (안전 우선).
+        if (
+            character == "doyoon"
+            and user_name_for_compose
+            and self._determine_name_address_usecase is not None
+        ):
+            user_name_for_compose = await self._determine_name_address_usecase.execute(
+                user_name=user_name_for_compose
+            )
 
         # 1차 합성 — P-0~P-9 + P-10 (AI 없음, 폴백 박스 3)
         response = self._compose_usecase.execute(

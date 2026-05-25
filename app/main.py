@@ -95,6 +95,9 @@ from app.domains.ai.application.usecase.generate_p10_box2_usecase import (
 from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
     GenerateP10LetterUseCase,
 )
+from app.domains.ai.application.usecase.determine_doyoon_name_address_usecase import (
+    DetermineDoyoonNameAddressUseCase,
+)
 from app.domains.ai.application.usecase.get_paid_report_usecase import (
     GetPaidReportUseCase,
 )
@@ -275,6 +278,7 @@ def _make_confirm_payment_usecase(
     p9_optimize_usecase: GenerateP9OptimizeUseCase | None = None
     p10_box1_usecase: GenerateP10Box1UseCase | None = None
     p10_box2_usecase: GenerateP10Box2UseCase | None = None
+    determine_name_address_usecase: DetermineDoyoonNameAddressUseCase | None = None
     if _settings.claude_api_key:
         claude_client = ClaudeClient(
             api_key=_settings.claude_api_key,
@@ -304,6 +308,7 @@ def _make_confirm_payment_usecase(
         p9_optimize_usecase = GenerateP9OptimizeUseCase(ai_client=claude_client)
         p10_box1_usecase = GenerateP10Box1UseCase(ai_client=claude_client)
         p10_box2_usecase = GenerateP10Box2UseCase(ai_client=claude_client)
+        determine_name_address_usecase = DetermineDoyoonNameAddressUseCase(ai_client=claude_client)
     # SES 이메일 발송 (sender + IAM 키 있을 때만, 없으면 폴백)
     email_sender: SendResultLinkEmailUseCase | None = None
     if _settings.aws_ses_sender:
@@ -330,6 +335,7 @@ def _make_confirm_payment_usecase(
         survey_repo=SurveyRepository(session),
         compose_usecase=ComposePaidReportUseCase(),
         p10_letter_usecase=p10_letter_usecase,
+        determine_name_address_usecase=determine_name_address_usecase,
         p0_diagnosis_usecase=p0_diagnosis_usecase,
         p1_opening_usecase=p1_opening_usecase,
         p1_trigger_usecase=p1_trigger_usecase,
