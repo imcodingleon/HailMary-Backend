@@ -1,4 +1,12 @@
-"""도윤 P-7 四 운명의 짝 · 결말 (2/2) — 룰 합성 + facts (1 박스)."""
+"""도윤 P-7 四 운명의 짝 · 결말 (2/2) — 룰 합성 + facts (1 박스).
+
+핵심 원칙 (2026-05-23 재설계):
+- AI는 *카드 표 라벨 (소멸 65% / 좋은 결말 78% / 좋은 결말 91%)* 만 풀이.
+- 별도 메타 수치 (sc1/2/3_six_month_pct, initiative_multiplier, wait_cost_multiplier,
+  expected_value_ratio) — facts에서 제외. 카드 외 수치는 사용자가 확인 불가 → hallucination처럼 보임.
+- 시나리오 우선순위: 시나리오 3 (91% 최고 수치, 단 조건부 대기) >
+  시나리오 2 (78% 권장 능동 분기) > 시나리오 1 (65% 소멸).
+"""
 
 from __future__ import annotations
 
@@ -17,40 +25,53 @@ def _validate(user_name: str, ilgan: str) -> None:
 
 
 def compose_doyoon_p7_ending(*, user_name: str, ilgan: str) -> str:
-    """4-3 결말 시나리오 ai_ending 합성 (400~450자, 5단락)."""
+    """4-3 결말 시나리오 ai_ending 합성 — 카드 풀이 톤 (380~560자, 5단락).
+
+    카드 라벨 (65%/78%/91%)만 사용. 별도 메타 수치 X.
+    """
     _validate(user_name, ilgan)
-    d = DOYOON_P7_DATA[ilgan]
+    _validate_ilgan_data(ilgan)
     ilgan_hanja = ILGAN_HANJA[ilgan]
 
     return (
-        "세 시나리오 각각 성공 확률과 기대값 정리해드릴게요.\n\n"
-        f"시나리오 1 — 지금 이대로 유지. 6개월 후 관계 성립 확률 {d.sc1_six_month_pct}. "
+        "세 갈래 시나리오, 카드로 정리해드렸어요.\n\n"
+        "시나리오 1 — 지금 이대로 두면 소멸 65%. "
         "양쪽 모두 정체된 채로 흐름이 약해지는 패턴이에요. "
-        "가장 흔한 결말이지만 기대값은 가장 낮아요.\n\n"
-        f"시나리오 2 — {user_name}님이 먼저 움직임. 6개월 후 관계 성립 확률 {d.sc2_six_month_pct}. "
-        f"데이터상 가장 권장되는 분기예요. {ilgan}({ilgan_hanja}) 일간이 먼저 신호를 보냈을 때 "
-        f"상대 호응률이 평균보다 {d.initiative_multiplier} 높게 측정되거든요. "
-        "깊은 사람이 먼저 표현했을 때의 무게가 데이터로도 잡혀요.\n\n"
-        f"시나리오 3 — 상대가 먼저 움직이기를 기다림. 6개월 후 관계 성립 확률 {d.sc3_six_month_pct}. "
-        f"가능성은 있지만 시간 비용이 평균 {d.wait_cost_multiplier} 더 들어요.\n\n"
-        f"{user_name}님 결정이에요. 다만 분석가로서 한 가지만 말씀드리면, "
-        f"시나리오 2가 기대값 기준 압도적이에요. "
-        f"{d.sc2_six_month_pct} vs {d.sc1_six_month_pct} — {d.expected_value_ratio} 차이예요."
+        "가장 흔한 결말이지만 그만큼 가장 위험한 경로입니다.\n\n"
+        f"시나리오 2 — {user_name}님이 먼저. 좋은 결말 78%. "
+        f"데이터상 가장 권장되는 능동 분기예요. "
+        f"{ilgan}({ilgan_hanja}) 일간 표본에서 먼저 작은 신호 보낼 때의 성공률이에요. "
+        f"{user_name}님이 통제할 수 있는 변수라는 점이 핵심이에요.\n\n"
+        "시나리오 3 — 상대가 먼저. 좋은 결말 91% — 수치 자체는 가장 높아요. "
+        "단 상대 움직임을 대기해야 하는 조건부 경로라 시간 비용이 큰 분기입니다.\n\n"
+        f"{user_name}님, 결정은 본인 것이에요. "
+        f"다만 분석가로서 한 마디 — 78%는 {user_name}님이 *지금 통제 가능한* 분기이고, "
+        "91%는 *대기 시간 위에 놓인* 분기예요. 능동 분기를 추천드립니다."
     )
 
 
+def _validate_ilgan_data(ilgan: str) -> None:
+    """DOYOON_P7_DATA에 일간 존재 확인 (compose에서 d 접근은 빼고 카드 라벨만 사용)."""
+    if ilgan not in DOYOON_P7_DATA:
+        raise KeyError(f"unknown ilgan: {ilgan!r}")
+
+
 def get_doyoon_p7_ending_facts(*, user_name: str, ilgan: str) -> dict[str, str]:
+    """facts — 카드 라벨만 prompt에 노출.
+
+    sc1/2/3_six_month_pct, initiative_multiplier, wait_cost_multiplier,
+    expected_value_ratio 등 *카드에 없는 별도 메타 수치는 제외*.
+    """
     _validate(user_name, ilgan)
-    d = DOYOON_P7_DATA[ilgan]
+    _validate_ilgan_data(ilgan)
     rule_text = compose_doyoon_p7_ending(user_name=user_name, ilgan=ilgan)
     return {
         "user_name": user_name,
         "ilgan_full": ilgan,
-        "sc1_six_month_pct": d.sc1_six_month_pct,
-        "sc2_six_month_pct": d.sc2_six_month_pct,
-        "sc3_six_month_pct": d.sc3_six_month_pct,
-        "initiative_multiplier": d.initiative_multiplier,
-        "wait_cost_multiplier": d.wait_cost_multiplier,
-        "expected_value_ratio": d.expected_value_ratio,
+        "ilgan_hanja": ILGAN_HANJA[ilgan],
+        # 카드 라벨 (모든 일간 동일 — _build_scenarios 공통)
+        "sc1_label": "소멸 65%",
+        "sc2_label": "좋은 결말 78%",
+        "sc3_label": "좋은 결말 91%",
         "rule_text": rule_text,
     }

@@ -44,27 +44,30 @@ def test_compose_all_ilgan() -> None:
 
 
 def test_facts_imsu() -> None:
+    """facts — 카드 라벨 (모든 일간 공통)만 노출, 별도 메타 수치는 제외."""
     f = get_doyoon_p7_ending_facts(user_name="홍길동", ilgan="임수")
-    assert f["sc1_six_month_pct"] == "22%"
-    assert f["sc2_six_month_pct"] == "71%"
-    assert f["sc3_six_month_pct"] == "38%"
-    assert f["initiative_multiplier"] == "1.4배"
-    assert f["wait_cost_multiplier"] == "2.7배"
-    assert f["expected_value_ratio"] == "3배"
+    assert f["sc1_label"] == "소멸 65%"
+    assert f["sc2_label"] == "좋은 결말 78%"
+    assert f["sc3_label"] == "좋은 결말 91%"
+    # 별도 메타 수치는 facts에 없음
+    assert "sc1_six_month_pct" not in f
+    assert "initiative_multiplier" not in f
 
 
 def _valid(facts):
+    """카드 풀이 톤 — 65%/78%/91% 직접 인용, 별도 메타 수치 X."""
     return (
-        "세 시나리오 분석 결과를 정리해드릴게요.\n\n"
-        f"시나리오 1 — 지금 이대로. 6개월 후 관계 성립 확률 {facts['sc1_six_month_pct']}로 측정됩니다. "
-        "양쪽 모두 정체된 채 흐름이 약해지는 패턴이에요. 기대값 기준 가장 낮은 구간입니다.\n\n"
-        f"시나리오 2 — {facts['user_name']}님이 먼저. 6개월 후 관계 성립 확률 {facts['sc2_six_month_pct']}로 가장 권장됩니다. "
-        f"신호 보냈을 때 상대 호응률이 평균보다 {facts['initiative_multiplier']} 높게 측정. "
-        "이게 분기 권장 근거입니다.\n\n"
-        f"시나리오 3 — 상대가 먼저. 6개월 후 관계 성립 확률 {facts['sc3_six_month_pct']}로 측정. "
-        f"가능성은 있지만 시간 비용이 평균 {facts['wait_cost_multiplier']} 더 든다는 점이 단점이에요.\n\n"
-        f"{facts['user_name']}님 결정이에요. 다만 기대값 기준 시나리오 2가 압도적입니다 — "
-        f"{facts['sc2_six_month_pct']} vs {facts['sc1_six_month_pct']} {facts['expected_value_ratio']} 차이예요."
+        "세 갈래 시나리오, 카드로 정리해드렸어요. 각 분기의 의미를 풀어드릴게요.\n\n"
+        "시나리오 1 — 지금 이대로 두면 소멸 65%. 양쪽 모두 정체된 채 흐름이 약해지는 패턴이에요. "
+        "가장 흔하지만 가장 위험한 경로입니다. 이 분기를 선택하면 시간이 흐를수록 가능성은 더 낮아집니다.\n\n"
+        f"시나리오 2 — {facts['user_name']}님이 먼저. 좋은 결말 78%. "
+        f"{facts['ilgan_full']}({facts['ilgan_hanja']}) 일간 표본 능동 분기로 권장됩니다. "
+        f"{facts['user_name']}님이 지금 통제 가능한 변수라는 점이 핵심이에요. 작은 신호 한 번이 결정점입니다.\n\n"
+        "시나리오 3 — 상대가 먼저. 좋은 결말 91% — 수치는 가장 높습니다. "
+        "단 상대 움직임을 대기해야 하는 조건부 경로라 시간 비용이 큰 분기예요. 통제 변수 밖에 있는 분기입니다.\n\n"
+        f"{facts['user_name']}님, 결정은 본인 것이에요. "
+        f"다만 78%는 {facts['user_name']}님이 지금 통제 가능한 분기이고, 91%는 대기 시간 위에 놓인 조건부 분기입니다. "
+        "능동 분기를 추천드립니다."
     )
 
 
@@ -76,9 +79,15 @@ def test_validate() -> None:
 
 @pytest.mark.asyncio
 async def test_usecase_falls_back() -> None:
+    """fallback 시 카드 라벨 (65/78/91) 포함, 별도 메타 수치 (22%, 71%, 38%) 미포함."""
     fake = _FakeAIClient(raise_exc=AIClientError("x"))
     out = await GenerateP7EndingUseCase(ai_client=fake).execute(
         user_name="홍길동", ilgan="임수"
     )
-    assert "71%" in out
-    assert "22%" in out
+    assert "65%" in out
+    assert "78%" in out
+    assert "91%" in out
+    # 카드에 없는 별도 수치는 룰 텍스트에도 없어야
+    assert "71%" not in out
+    assert "22%" not in out
+    assert "38%" not in out
