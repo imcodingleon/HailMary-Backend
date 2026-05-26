@@ -50,6 +50,7 @@ jobs:
           PAYAPP_LINKVAL=${{ secrets.PAYAPP_LINKVAL }}
           PAYAPP_FEEDBACK_URL=${{ secrets.STAGING_PAYAPP_FEEDBACK_URL }}
           PAYAPP_RETURN_URL=${{ secrets.STAGING_PAYAPP_RETURN_URL }}
+          FRONTEND_BASE_URL=${{ secrets.STAGING_FRONTEND_BASE_URL }}
           AMPLITUDE_API_KEY=${{ secrets.AMPLITUDE_API_KEY }}
           AMPLITUDE_BASE_URL=${{ secrets.AMPLITUDE_BASE_URL }}
           CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
