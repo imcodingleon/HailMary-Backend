@@ -23,6 +23,9 @@ from app.domains.ai.application.usecase.compose_paid_report_usecase import (
 from app.domains.ai.application.usecase.create_paid_report_usecase import (
     CreatePaidReportUseCase,
 )
+from app.domains.ai.application.usecase.determine_doyoon_name_address_usecase import (
+    DetermineDoyoonNameAddressUseCase,
+)
 from app.domains.ai.application.usecase.generate_p0_diagnosis_usecase import (
     GenerateP0DiagnosisUseCase,
 )
@@ -95,9 +98,6 @@ from app.domains.ai.application.usecase.generate_p10_box2_usecase import (
 from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
     GenerateP10LetterUseCase,
 )
-from app.domains.ai.application.usecase.determine_doyoon_name_address_usecase import (
-    DetermineDoyoonNameAddressUseCase,
-)
 from app.domains.ai.application.usecase.get_paid_report_usecase import (
     GetPaidReportUseCase,
 )
@@ -105,7 +105,13 @@ from app.domains.ai.application.usecase.send_result_link_email_usecase import (
     SendResultLinkEmailUseCase,
 )
 from app.domains.payment.adapter.inbound.api.payment_router import (
-    get_confirm_payment_usecase,
+    dev_router as payment_dev_router,
+)
+from app.domains.payment.adapter.inbound.api.payment_router import (
+    get_dev_bypass_usecase,
+    get_handle_feedback_usecase,
+    get_payment_status_usecase,
+    get_request_payment_usecase,
 )
 from app.domains.payment.adapter.inbound.api.payment_router import (
     router as payment_router,
@@ -113,7 +119,7 @@ from app.domains.payment.adapter.inbound.api.payment_router import (
 from app.domains.payment.adapter.outbound.external.amplitude_adapter import (
     AmplitudeAnalyticsAdapter,
 )
-from app.domains.payment.adapter.outbound.external.toss_client import TossPaymentsClient
+from app.domains.payment.adapter.outbound.external.payapp_client import PayAppClient
 from app.domains.payment.adapter.outbound.persistence.payment_repository import (
     PaymentRepository,
 )
@@ -122,8 +128,17 @@ from app.domains.payment.adapter.outbound.user_demographics_adapter import (
     UserDemographicsAdapter,
 )
 from app.domains.payment.adapter.outbound.user_lookup_adapter import UserLookupAdapter
-from app.domains.payment.application.usecase.confirm_payment_usecase import (
-    ConfirmPaymentUseCase,
+from app.domains.payment.application.usecase.dev_bypass_payment_usecase import (
+    DevBypassPaymentUseCase,
+)
+from app.domains.payment.application.usecase.get_payment_status_usecase import (
+    GetPaymentStatusUseCase,
+)
+from app.domains.payment.application.usecase.handle_payapp_feedback_usecase import (
+    HandlePayAppFeedbackUseCase,
+)
+from app.domains.payment.application.usecase.request_payment_usecase import (
+    RequestPaymentUseCase,
 )
 from app.domains.user.adapter.inbound.api.auth import get_user_repository
 from app.domains.user.adapter.inbound.api.user_router import (
@@ -242,15 +257,46 @@ def _make_get_free_result_usecase(
 
 # ── Payment Domain UseCase 팩토리 ────────────────────────────────────────────
 
-def _make_confirm_payment_usecase(
-    session: AsyncSession = Depends(_get_session),
-) -> ConfirmPaymentUseCase:
-    if not _settings.toss_secret_key:
-        raise RuntimeError("TOSS_SECRET_KEY 환경변수가 설정되지 않았습니다.")
-    gateway = TossPaymentsClient(
-        secret_key=_settings.toss_secret_key,
-        base_url=_settings.toss_base_url,
+def _make_payapp_client() -> PayAppClient:
+    """PayApp 클라이언트 싱글톤 팩토리. Phase 2 endpoint들에서 Depends로 주입."""
+    missing: list[str] = []
+    if not _settings.payapp_userid:
+        missing.append("PAYAPP_USERID")
+    if not _settings.payapp_linkkey:
+        missing.append("PAYAPP_LINKKEY")
+    if not _settings.payapp_linkval:
+        missing.append("PAYAPP_LINKVAL")
+    if not _settings.payapp_feedback_url:
+        missing.append("PAYAPP_FEEDBACK_URL")
+    if not _settings.payapp_return_url:
+        missing.append("PAYAPP_RETURN_URL")
+    if missing:
+        raise RuntimeError(
+            f"PayApp 환경변수가 설정되지 않았습니다: {', '.join(missing)}"
+        )
+    # Settings에서 None 체크 통과한 값은 모두 str — mypy 만족용 cast 대신 assert
+    assert _settings.payapp_userid is not None
+    assert _settings.payapp_linkkey is not None
+    assert _settings.payapp_linkval is not None
+    assert _settings.payapp_feedback_url is not None
+    assert _settings.payapp_return_url is not None
+    return PayAppClient(
+        userid=_settings.payapp_userid,
+        linkkey=_settings.payapp_linkkey,
+        linkval=_settings.payapp_linkval,
+        base_url=_settings.payapp_base_url,
+        feedback_url=_settings.payapp_feedback_url,
+        return_url=_settings.payapp_return_url,
     )
+
+
+def _build_paid_report_pipeline(
+    session: AsyncSession,
+) -> tuple[CreatePaidReportUseCase, SajuHashResolver, UserLookupAdapter, UserDemographicsAdapter, "AmplitudeAnalyticsAdapter"]:
+    """결제 완료 후 트리거되는 PaidReport 합성 + 사용자 룩업 + 분석 파이프라인.
+
+    PayApp feedback UseCase에서 사용.
+    """
     paid_report_repo = PaidReportRepository(session)
     # P-10 AI 호출용 Claude 클라이언트 (키 있을 때만, 없으면 폴백)
     p10_letter_usecase: GenerateP10LetterUseCase | None = None
@@ -375,12 +421,55 @@ def _make_confirm_payment_usecase(
         ),
         environment=_settings.app_env,
     )
-    return ConfirmPaymentUseCase(
-        gateway=gateway,
+    return create_paid_report_usecase, saju_hash_resolver, user_lookup, user_demographics, analytics
+
+
+def _make_request_payment_usecase(
+    session: AsyncSession = Depends(_get_session),
+) -> RequestPaymentUseCase:
+    user_repo = UserRepository(session)
+    return RequestPaymentUseCase(
+        gateway=_make_payapp_client(),
         repo=PaymentRepository(session),
-        user_lookup=user_lookup,
-        paid_report_creator=create_paid_report_usecase,
-        saju_hash_resolver=saju_hash_resolver,
+        user_lookup=UserLookupAdapter(user_repo=user_repo),
+    )
+
+
+def _make_handle_feedback_usecase(
+    session: AsyncSession = Depends(_get_session),
+) -> HandlePayAppFeedbackUseCase:
+    if not _settings.payapp_linkkey or not _settings.payapp_linkval:
+        raise RuntimeError(
+            "PAYAPP_LINKKEY/PAYAPP_LINKVAL 환경변수가 설정되지 않았습니다."
+        )
+    creator, resolver, _user_lookup, user_demographics, analytics = _build_paid_report_pipeline(session)
+    return HandlePayAppFeedbackUseCase(
+        repo=PaymentRepository(session),
+        expected_linkkey=_settings.payapp_linkkey,
+        expected_linkval=_settings.payapp_linkval,
+        paid_report_creator=creator,
+        saju_hash_resolver=resolver,
+        analytics=analytics,
+        user_demographics=user_demographics,
+    )
+
+
+def _make_payment_status_usecase(
+    session: AsyncSession = Depends(_get_session),
+) -> GetPaymentStatusUseCase:
+    return GetPaymentStatusUseCase(repo=PaymentRepository(session))
+
+
+def _make_dev_bypass_usecase(
+    session: AsyncSession = Depends(_get_session),
+) -> DevBypassPaymentUseCase:
+    user_repo = UserRepository(session)
+    creator, resolver, _user_lookup, user_demographics, analytics = _build_paid_report_pipeline(session)
+    return DevBypassPaymentUseCase(
+        repo=PaymentRepository(session),
+        user_lookup=UserLookupAdapter(user_repo=user_repo),
+        paid_report_creator=creator,
+        saju_hash_resolver=resolver,
         analytics=analytics,
         user_demographics=user_demographics,
     )
@@ -404,13 +493,22 @@ app.dependency_overrides[get_user_repository] = _make_user_repository
 app.dependency_overrides[get_submit_user_info_usecase] = _make_submit_user_info_usecase
 app.dependency_overrides[get_submit_survey_usecase] = _make_submit_survey_usecase
 app.dependency_overrides[get_free_result_usecase] = _make_get_free_result_usecase
-app.dependency_overrides[get_confirm_payment_usecase] = _make_confirm_payment_usecase
+app.dependency_overrides[get_request_payment_usecase] = _make_request_payment_usecase
+app.dependency_overrides[get_handle_feedback_usecase] = _make_handle_feedback_usecase
+app.dependency_overrides[get_payment_status_usecase] = _make_payment_status_usecase
+app.dependency_overrides[get_dev_bypass_usecase] = _make_dev_bypass_usecase
 app.dependency_overrides[get_paid_report_usecase] = _make_get_paid_report_usecase
 
 app.include_router(user_router)
 app.include_router(payment_router)
 app.include_router(paid_report_router)
 app.include_router(paid_report_share_router)
+
+# ⚠️ 결제 패스 endpoint — prod 환경에서는 등록 안 함. staging/local/test 에서만 노출.
+# 워크플로마다 APP_ENV 값 다를 수 있음 (prod 워크플로는 "production") — 명시 화이트리스트로 비교.
+_DEV_BYPASS_ENVS = {"local", "test", "staging"}
+if _settings.app_env.lower() in _DEV_BYPASS_ENVS:
+    app.include_router(payment_dev_router)
 
 # QA 로그인 게이트 — APP_ENV=test 일 때만 등록 (운영 환경 무영향)
 if _settings.app_env == "test":

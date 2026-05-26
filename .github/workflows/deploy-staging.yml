@@ -45,8 +45,11 @@ jobs:
           MYSQL_USER=${{ secrets.MYSQL_USER }}
           FORTUNETELLER_URL=${{ secrets.FORTUNETELLER_URL }}
           JWT_SECRET=${{ secrets.STAGING_JWT_SECRET }}
-          TOSS_SECRET_KEY=${{ secrets.TOSS_SECRET_KEY }}
-          TOSS_BASE_URL=${{ secrets.TOSS_BASE_URL }}
+          PAYAPP_USERID=${{ secrets.PAYAPP_USERID }}
+          PAYAPP_LINKKEY=${{ secrets.PAYAPP_LINKKEY }}
+          PAYAPP_LINKVAL=${{ secrets.PAYAPP_LINKVAL }}
+          PAYAPP_FEEDBACK_URL=${{ secrets.STAGING_PAYAPP_FEEDBACK_URL }}
+          PAYAPP_RETURN_URL=${{ secrets.STAGING_PAYAPP_RETURN_URL }}
           AMPLITUDE_API_KEY=${{ secrets.AMPLITUDE_API_KEY }}
           AMPLITUDE_BASE_URL=${{ secrets.AMPLITUDE_BASE_URL }}
           CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}

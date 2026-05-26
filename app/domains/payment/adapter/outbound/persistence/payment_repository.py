@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -5,6 +7,7 @@ from app.domains.payment.domain.entity.payment import Payment
 from app.domains.payment.domain.port.payment_repository_port import (
     PaymentRepositoryPort,
 )
+from app.domains.payment.domain.value_object.payment_status import PaymentStatus
 from app.domains.payment.infrastructure.mapper.payment_mapper import PaymentMapper
 from app.domains.payment.infrastructure.orm.payment_orm import PaymentORM
 
@@ -32,3 +35,22 @@ class PaymentRepository(PaymentRepositoryPort):
         )
         orm = result.scalar_one_or_none()
         return PaymentMapper.to_entity(orm) if orm else None
+
+    async def update_status(
+        self,
+        *,
+        order_id: str,
+        status: PaymentStatus,
+        approved_at: datetime | None = None,
+    ) -> Payment | None:
+        result = await self._session.execute(
+            select(PaymentORM).where(PaymentORM.order_id == order_id),
+        )
+        orm = result.scalar_one_or_none()
+        if orm is None:
+            return None
+        orm.status = status
+        if approved_at is not None:
+            orm.approved_at = approved_at
+        await self._session.flush()
+        return PaymentMapper.to_entity(orm)

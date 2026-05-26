@@ -11,7 +11,7 @@ payment 도메인이 user 도메인을 직접 import하지 않도록 application
 """
 
 from app.domains.ai.domain.service.saju_hash import compute_saju_hash
-from app.domains.payment.application.usecase.confirm_payment_usecase import (
+from app.domains.payment.application.payment_ports import (
     SajuHashResolverPort,
 )
 from app.domains.user.domain.port.saju_result_repository_port import (

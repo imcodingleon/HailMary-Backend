@@ -19,15 +19,17 @@ _ENV_FILE: str = _ENV_FILE_MAP.get(_CURRENT_ENV, ".env.local")
 class Settings(BaseSettings):
     database_url: str
     fortuneteller_url: str
-    payapp_base_url: str | None = None
-    payapp_api_key: str | None = None
     claude_api_key: str | None = None
     claude_model: str = "claude-sonnet-4-6"
     app_env: str = "local"
     debug: bool = False
-    # 토스페이먼츠 결제 승인 (백엔드 전용)
-    toss_secret_key: str | None = None
-    toss_base_url: str = "https://api.tosspayments.com"
+    # PayApp 결제 (서버 to 서버, FE는 키 사용 X)
+    payapp_base_url: str = "https://api.payapp.kr"
+    payapp_userid: str | None = None        # 가맹점 ID
+    payapp_linkkey: str | None = None       # 연동 KEY (feedback 검증용)
+    payapp_linkval: str | None = None       # 연동 VALUE (feedback 검증용)
+    payapp_feedback_url: str | None = None  # PayApp webhook 수신 URL (외부 노출 필수)
+    payapp_return_url: str | None = None    # 결제완료 후 사용자 도착 URL
     # Amplitude HTTP API V2 (백엔드 결제 이벤트 발화용)
     amplitude_api_key: str | None = None
     amplitude_base_url: str = "https://api2.amplitude.com"
@@ -48,4 +50,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[call-arg]
+    return Settings()

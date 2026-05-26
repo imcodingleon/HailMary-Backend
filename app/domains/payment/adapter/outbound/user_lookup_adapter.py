@@ -7,7 +7,7 @@ payment 도메인이 user 도메인을 직접 import하지 않도록, applicatio
 - 존재하면 user.id 반환
 """
 
-from app.domains.payment.application.usecase.confirm_payment_usecase import (
+from app.domains.payment.application.payment_ports import (
     UserLookupPort,
 )
 from app.domains.user.domain.port.user_repository_port import UserRepositoryPort

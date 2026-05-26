@@ -3,16 +3,18 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from app.domains.payment.domain.value_object.payment_status import CharacterCode
 
 
-class ConfirmPaymentRequest(BaseModel):
+class RequestPaymentRequest(BaseModel):
+    """PayApp 결제 요청 — FE → BE.
+
+    가격(amount)은 BE의 character_price 마스터가 결정. FE는 character + email 만 전달.
+    orderId는 BE가 발급.
+    """
+
     model_config = ConfigDict(populate_by_name=True)
 
-    payment_key: str = Field(alias="paymentKey", min_length=1)
-    order_id: str = Field(alias="orderId", min_length=1)
     session_token: str = Field(alias="sessionToken", min_length=1)
-    amount: int = Field(gt=0)
     character: CharacterCode
     customer_email: EmailStr = Field(alias="customerEmail")
-    # Amplitude 깔때기 조인용 — 프론트가 amplitude.getDeviceId()/getSessionId() 동봉.
-    # 누락이어도 confirm 동작에는 영향 없음. user_id 기반으로만 합류.
+    # Amplitude 깔때기 조인용 (선택)
     device_id: str | None = Field(default=None, alias="deviceId")
     session_id: int | None = Field(default=None, alias="sessionId")
