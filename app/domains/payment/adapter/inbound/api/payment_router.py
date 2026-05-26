@@ -7,6 +7,9 @@ from app.domains.payment.application.request.dev_bypass_request import (
 from app.domains.payment.application.request.request_payment_request import (
     RequestPaymentRequest,
 )
+from app.domains.payment.application.request.update_email_request import (
+    UpdateEmailRequest,
+)
 from app.domains.payment.application.response.payment_status_response import (
     PaymentStatusResponse,
 )
@@ -25,6 +28,9 @@ from app.domains.payment.application.usecase.handle_payapp_feedback_usecase impo
 from app.domains.payment.application.usecase.request_payment_usecase import (
     RequestPaymentUseCase,
 )
+from app.domains.payment.application.usecase.update_email_and_resend_usecase import (
+    UpdateEmailAndResendUseCase,
+)
 from app.domains.payment.domain.port.payapp_payment_port import PayAppGatewayError
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
@@ -40,6 +46,10 @@ def get_handle_feedback_usecase() -> HandlePayAppFeedbackUseCase:
 
 
 def get_payment_status_usecase() -> GetPaymentStatusUseCase:
+    raise NotImplementedError
+
+
+def get_update_email_usecase() -> UpdateEmailAndResendUseCase:
     raise NotImplementedError
 
 
@@ -88,6 +98,25 @@ async def payapp_feedback(
     form_dict = {k: v for k, v in form.items() if isinstance(v, str)}
     await usecase.execute(form_dict)
     return PlainTextResponse("SUCCESS", status_code=200)
+
+
+@router.post("/update-email", status_code=status.HTTP_200_OK)
+async def update_email(
+    body: UpdateEmailRequest,
+    usecase: UpdateEmailAndResendUseCase = Depends(get_update_email_usecase),
+) -> dict[str, str]:
+    """결제 완료 후 사용자가 결과지 받을 이메일을 수정한 경우.
+
+    Payment.customer_email 업데이트 + 이미 합성된 PaidReport 있으면 새 주소로 메일 재발송.
+    """
+    try:
+        await usecase.execute(order_id=body.order_id, new_email=body.new_email)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    return {"status": "updated"}
 
 
 @router.get(

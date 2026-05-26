@@ -52,6 +52,25 @@ class UserDemographicsPort(Protocol):
     async def find_gender_by_user_id(self, user_id: int) -> str | None: ...
 
 
+class PaidReportShareLookupPort(Protocol):
+    """order_id 로 share_code 조회 (이메일 재발송용). PaidReport 미합성 시 None."""
+
+    async def find_share_code(self, order_id: str) -> str | None: ...
+
+
+class EmailResendPort(Protocol):
+    """결과지 링크 이메일 재발송."""
+
+    async def execute(
+        self,
+        *,
+        to: str,
+        share_code: str,
+        character: str,
+        expires_at: datetime,
+    ) -> None: ...
+
+
 async def safe_track_payment_completed(
     *,
     analytics: AnalyticsPort,

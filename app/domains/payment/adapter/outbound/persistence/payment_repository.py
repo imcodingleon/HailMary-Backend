@@ -54,3 +54,19 @@ class PaymentRepository(PaymentRepositoryPort):
             orm.approved_at = approved_at
         await self._session.flush()
         return PaymentMapper.to_entity(orm)
+
+    async def update_customer_email(
+        self,
+        *,
+        order_id: str,
+        new_email: str,
+    ) -> Payment | None:
+        result = await self._session.execute(
+            select(PaymentORM).where(PaymentORM.order_id == order_id),
+        )
+        orm = result.scalar_one_or_none()
+        if orm is None:
+            return None
+        orm.customer_email = new_email
+        await self._session.flush()
+        return PaymentMapper.to_entity(orm)

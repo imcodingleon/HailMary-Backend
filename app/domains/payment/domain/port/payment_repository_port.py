@@ -25,3 +25,13 @@ class PaymentRepositoryPort(ABC):
     ) -> Payment | None:
         """결제 상태 갱신 (PayApp webhook 처리용). 없으면 None 반환."""
         ...
+
+    @abstractmethod
+    async def update_customer_email(
+        self,
+        *,
+        order_id: str,
+        new_email: str,
+    ) -> Payment | None:
+        """결제 완료 후 사용자가 메일 수정 시 호출. 없으면 None 반환."""
+        ...

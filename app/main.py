@@ -112,6 +112,7 @@ from app.domains.payment.adapter.inbound.api.payment_router import (
     get_handle_feedback_usecase,
     get_payment_status_usecase,
     get_request_payment_usecase,
+    get_update_email_usecase,
 )
 from app.domains.payment.adapter.inbound.api.payment_router import (
     router as payment_router,
@@ -139,6 +140,9 @@ from app.domains.payment.application.usecase.handle_payapp_feedback_usecase impo
 )
 from app.domains.payment.application.usecase.request_payment_usecase import (
     RequestPaymentUseCase,
+)
+from app.domains.payment.application.usecase.update_email_and_resend_usecase import (
+    UpdateEmailAndResendUseCase,
 )
 from app.domains.user.adapter.inbound.api.auth import get_user_repository
 from app.domains.user.adapter.inbound.api.user_router import (
@@ -460,6 +464,47 @@ def _make_payment_status_usecase(
     return GetPaymentStatusUseCase(repo=PaymentRepository(session))
 
 
+def _make_update_email_usecase(
+    session: AsyncSession = Depends(_get_session),
+) -> UpdateEmailAndResendUseCase:
+    """결제 후 이메일 수정 + 메일 재발송. SES sender 없으면 메일 단계만 no-op로 폴백."""
+    paid_report_repo = PaidReportRepository(session)
+
+    class _ShareLookupAdapter:
+        async def find_share_code(self, order_id: str) -> str | None:
+            r = await paid_report_repo.find_by_order_id(order_id)
+            return r.share_code if r else None
+
+    # email_resend: SES 설정되어 있을 때만 실 발송, 아니면 no-op (메일 수정만 반영)
+    email_resend_impl: object
+    if _settings.aws_ses_sender:
+        ses_client = SESClient(
+            region=_settings.aws_region,
+            sender=_settings.aws_ses_sender,
+            access_key_id=_settings.aws_access_key_id,
+            secret_access_key=_settings.aws_secret_access_key,
+        )
+        base_url = (
+            "http://localhost:3000"
+            if _settings.app_env in ("local", "test")
+            else "https://dohwaseonsaju.com"
+        )
+        email_resend_impl = SendResultLinkEmailUseCase(
+            ses_client=ses_client, base_url=base_url
+        )
+    else:
+        class _NoopResend:
+            async def execute(self, **_: object) -> None:
+                return None
+        email_resend_impl = _NoopResend()
+
+    return UpdateEmailAndResendUseCase(
+        payment_repo=PaymentRepository(session),
+        share_lookup=_ShareLookupAdapter(),
+        email_resend=email_resend_impl,
+    )
+
+
 def _make_dev_bypass_usecase(
     session: AsyncSession = Depends(_get_session),
 ) -> DevBypassPaymentUseCase:
@@ -496,6 +541,7 @@ app.dependency_overrides[get_free_result_usecase] = _make_get_free_result_usecas
 app.dependency_overrides[get_request_payment_usecase] = _make_request_payment_usecase
 app.dependency_overrides[get_handle_feedback_usecase] = _make_handle_feedback_usecase
 app.dependency_overrides[get_payment_status_usecase] = _make_payment_status_usecase
+app.dependency_overrides[get_update_email_usecase] = _make_update_email_usecase
 app.dependency_overrides[get_dev_bypass_usecase] = _make_dev_bypass_usecase
 app.dependency_overrides[get_paid_report_usecase] = _make_get_paid_report_usecase
 
