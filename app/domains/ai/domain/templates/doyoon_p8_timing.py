@@ -15,8 +15,8 @@ from app.domains.ai.domain.templates.yeonwoo_p8_timing import (
     VALID_ILGAN,
     _classify_state,
     _format_month_label,
-    _peak_label_for_ai,
     _pct_to_hearts_p8,
+    _peak_label_for_ai,
     _pick_top_two_peaks,
 )
 

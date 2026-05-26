@@ -30,16 +30,3 @@ class PaymentMethod(str, Enum):
     MOBILE_PHONE = "MOBILE_PHONE"
     OTHER = "OTHER"
 
-    @classmethod
-    def from_toss(cls, korean: str | None) -> "PaymentMethod | None":
-        """토스 응답의 한글 method 값을 도메인 enum 으로 변환. 누락은 None, 미정의는 OTHER."""
-        if not korean:
-            return None
-        mapping = {
-            "카드": cls.CARD,
-            "간편결제": cls.EASY_PAY,
-            "계좌이체": cls.TRANSFER,
-            "가상계좌": cls.VIRTUAL_ACCOUNT,
-            "휴대폰": cls.MOBILE_PHONE,
-        }
-        return mapping.get(korean.strip(), cls.OTHER)

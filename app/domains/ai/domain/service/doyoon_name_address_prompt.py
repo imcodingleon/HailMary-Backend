@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 
-
 _SYSTEM_PROMPT = """\
 당신은 한국 이름 분류 분석가입니다.
 

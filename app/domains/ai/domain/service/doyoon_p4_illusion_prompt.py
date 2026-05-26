@@ -95,7 +95,7 @@ def validate_p4_illusion(text: str, facts: dict[str, str]) -> tuple[bool, str]:
     if facts["user_name"] not in text:
         return False, "user_name missing"
     if facts["ilgan_full"] not in text:
-        return False, f"ilgan_full missing"
+        return False, "ilgan_full missing"
     for k in ("illusion_multiplier", "real_growth_pct", "fake_drop_pct",
               "accuracy_multiplier",
               "sign_1_keyword", "sign_1_pct",

@@ -35,6 +35,9 @@ from app.domains.ai.domain.value_object.character_persona import (
 from app.domains.ai.domain.value_object.report_status import ReportStatus
 
 if TYPE_CHECKING:
+    from app.domains.ai.application.usecase.determine_doyoon_name_address_usecase import (
+        DetermineDoyoonNameAddressUseCase,
+    )
     from app.domains.ai.application.usecase.generate_p0_diagnosis_usecase import (
         GenerateP0DiagnosisUseCase,
     )
@@ -106,9 +109,6 @@ if TYPE_CHECKING:
     )
     from app.domains.ai.application.usecase.generate_p10_letter_usecase import (
         GenerateP10LetterUseCase,
-    )
-    from app.domains.ai.application.usecase.determine_doyoon_name_address_usecase import (
-        DetermineDoyoonNameAddressUseCase,
     )
     from app.domains.ai.application.usecase.send_result_link_email_usecase import (
         SendResultLinkEmailUseCase,

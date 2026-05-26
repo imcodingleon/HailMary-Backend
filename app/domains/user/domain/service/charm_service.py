@@ -401,9 +401,7 @@ def _calculate_score(saju: dict[str, Any], dohwa_pillars: list[PillarKey]) -> in
     # 도화 pillar 베이스 가산이 빠진 손실을 SAL_PRIORITY 최우선 살로 보충해서
     # "강렬한 매력" 같은 카피와 점수 라벨의 정합성을 맞춤. 둘 이상 보유 시 우선 살 하나만.
     if not dohwa_pillars:
-        if "cheon_eul_gwi_in" in sin_sals:
-            score += 25
-        elif "hong_yeom_sal" in sin_sals:
+        if "cheon_eul_gwi_in" in sin_sals or "hong_yeom_sal" in sin_sals:
             score += 25
         elif "geum_yeo_rok" in sin_sals:
             score += 20

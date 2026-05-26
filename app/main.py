@@ -109,6 +109,7 @@ from app.domains.payment.adapter.inbound.api.payment_router import (
 )
 from app.domains.payment.adapter.inbound.api.payment_router import (
     get_dev_bypass_usecase,
+    get_frontend_base_url,
     get_handle_feedback_usecase,
     get_payment_status_usecase,
     get_request_payment_usecase,
@@ -543,6 +544,7 @@ app.dependency_overrides[get_handle_feedback_usecase] = _make_handle_feedback_us
 app.dependency_overrides[get_payment_status_usecase] = _make_payment_status_usecase
 app.dependency_overrides[get_update_email_usecase] = _make_update_email_usecase
 app.dependency_overrides[get_dev_bypass_usecase] = _make_dev_bypass_usecase
+app.dependency_overrides[get_frontend_base_url] = lambda: _settings.frontend_base_url
 app.dependency_overrides[get_paid_report_usecase] = _make_get_paid_report_usecase
 
 app.include_router(user_router)

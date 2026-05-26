@@ -10,10 +10,7 @@ from app.domains.ai.domain.value_object.doyoon_p9_data import (
     COMBINED_EFFECT_MULTIPLIER,
     COMBINED_EFFECT_VALUE,
     DOYOON_P9_DATA,
-    IMMEDIATE_IMPACT_PCT,
     OHANG_BOOST_PCT,
-    OHANG_MAX_BOOST_PCT,
-    OHANG_RESPONSE_MULTIPLIER,
     VALID_DOYOON_P9_ILGAN,
 )
 

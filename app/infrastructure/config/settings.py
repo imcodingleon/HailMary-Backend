@@ -29,7 +29,9 @@ class Settings(BaseSettings):
     payapp_linkkey: str | None = None       # 연동 KEY (feedback 검증용)
     payapp_linkval: str | None = None       # 연동 VALUE (feedback 검증용)
     payapp_feedback_url: str | None = None  # PayApp webhook 수신 URL (외부 노출 필수)
-    payapp_return_url: str | None = None    # 결제완료 후 사용자 도착 URL
+    payapp_return_url: str | None = None    # 결제완료 후 사용자 도착 URL (BE redirect endpoint 권장)
+    # PayApp returnurl 처리 후 FE로 redirect할 baseURL (skip_cstpage POST 우회용)
+    frontend_base_url: str = "http://localhost:3000"
     # Amplitude HTTP API V2 (백엔드 결제 이벤트 발화용)
     amplitude_api_key: str | None = None
     amplitude_base_url: str = "https://api2.amplitude.com"

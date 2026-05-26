@@ -10,7 +10,6 @@ from app.domains.ai.domain.templates.doyoon_p10_box_letter import (
     calc_box_length_range,
 )
 
-
 _BASE_MIN = 400
 _BASE_MAX = 550
 

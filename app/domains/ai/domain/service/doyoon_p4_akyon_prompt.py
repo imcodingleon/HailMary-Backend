@@ -92,7 +92,7 @@ def validate_p4_akyon(text: str, facts: dict[str, str]) -> tuple[bool, str]:
     if facts["user_name"] not in text:
         return False, "user_name missing"
     if facts["ilgan_full"] not in text:
-        return False, f"ilgan_full missing"
+        return False, "ilgan_full missing"
     for k in ("height_distribution_pct", "impression_first", "impression_6m",
               "impression_gap", "common_signal_pct"):
         if facts[k] not in text:

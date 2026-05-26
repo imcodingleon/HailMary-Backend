@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from app.domains.payment.application.request.dev_bypass_request import (
     DevBypassRequest,
@@ -79,6 +79,26 @@ async def request_payment(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         ) from e
+
+
+def get_frontend_base_url() -> str:
+    """main.py에서 dependency_overrides로 settings.frontend_base_url 주입."""
+    raise NotImplementedError
+
+
+@router.post("/return")
+async def payapp_return(
+    request: Request,  # noqa: ARG001 — POST body는 사용 안 하지만 form 처리 위해 keep
+    frontend_base_url: str = Depends(get_frontend_base_url),
+) -> RedirectResponse:
+    """PayApp `skip_cstpage=y` 시 returnurl로 POST 호출됨 — S3는 POST 못 받으므로
+    BE가 받아서 FE `/checkout/success/` 로 303 redirect (POST → GET 우회).
+
+    PayApp이 form-data로 결제 결과 같이 보내지만 우리는 webhook(`/feedback`)에서 이미
+    처리하므로 여기선 무시. FE polling이 sessionStorage.checkoutPending 으로 상태 추적.
+    """
+    target = f"{frontend_base_url.rstrip('/')}/checkout/success/"
+    return RedirectResponse(url=target, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post(

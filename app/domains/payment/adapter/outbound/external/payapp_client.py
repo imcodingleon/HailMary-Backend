@@ -68,8 +68,8 @@ class PayAppClient(PayAppPaymentPort):
             "feedbackurl": self._feedback_url,
             "returnurl": self._return_url,
             "smsuse": "n",         # 카카오톡 결제링크 발송 X (FE에서 payurl로 직접 리다이렉트)
-            # skip_cstpage 제거 — y로 두면 returnurl이 POST 호출되어 S3 정적 호스팅이
-            # 받지 못해 404 발생. 매출전표 페이지 거치고 사용자 "확인" 클릭 시 GET 이동 → 정상.
+            "skip_cstpage": "y",   # 매출전표 페이지 스킵 — returnurl을 BE redirect endpoint로
+                                   # 두고 BE가 303 응답으로 FE로 GET 이동시킴 (POST→GET 우회).
             "checkretry": "y",     # feedback SUCCESS 아니면 최대 10회 재시도
         }
         if recv_email:

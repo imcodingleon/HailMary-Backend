@@ -20,7 +20,6 @@ from app.domains.ai.domain.value_object.doyoon_p4_data import DOYOON_P4_DATA
 from app.domains.ai.domain.value_object.doyoon_p5_data import DOYOON_P5_DATA
 from app.domains.ai.domain.value_object.doyoon_p6_data import DOYOON_P6_DATA
 
-
 STEP1_LABEL: dict[str, str] = {
     "waiting_new": "새로운 인연을 기다리는 상태",
     "crushing": "썸 진행 중",

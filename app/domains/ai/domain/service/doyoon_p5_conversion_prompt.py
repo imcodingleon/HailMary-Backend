@@ -75,9 +75,9 @@ def validate_p5_conversion(text: str, facts: dict[str, str]) -> tuple[bool, str]
     if pcts_found < 3:
         return False, f"conversion steps insufficient: {pcts_found}/4"
     if facts["second_meeting_multiplier"] not in text:
-        return False, f"second_meeting_multiplier missing"
+        return False, "second_meeting_multiplier missing"
     if facts["final_gap_pct"] not in text:
-        return False, f"final_gap_pct missing"
+        return False, "final_gap_pct missing"
     paragraph_breaks = text.count("\n\n")
     if paragraph_breaks != 2:
         return False, f"paragraph structure invalid: {paragraph_breaks}"
