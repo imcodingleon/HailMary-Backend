@@ -323,12 +323,13 @@ logger = logging.getLogger(__name__)
 
 
 def _allowed_origins() -> list[str]:
-    # local/test 환경: localhost 프론트 dev 서버 + staging 도메인.
+    # local/test 환경: localhost 프론트 dev 서버 + staging 도메인 + 2.0 app 도메인.
     if _settings.app_env in ("local", "test"):
         return [
             "http://localhost:3000",
             "http://127.0.0.1:3000",
             "https://staging.dohwaseonsaju.com",
+            "https://app.dohwaseonsaju.com",  # 2.0 PG 심사 사이트(전용 레인 app-api)
         ]
     return [
         "https://dohwaseonsaju.com",

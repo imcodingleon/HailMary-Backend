@@ -1,0 +1,128 @@
+name: Deploy Backend APP 2.0 to EC2
+
+# 도화선 2.0 PG 심사 전용 백엔드 레인.
+# main 프리즈 유지: 이 워크플로는 2.0 브랜치 push 에서만 돈다.
+# 배포 대상 = 공유 EC2의 3번째 레인(hailmary-backend-app / uvicorn 8002 / hailmary_2_0 DB).
+# 1.0 prod(hailmary-backend, 8000) / staging(hailmary-backend-staging, 8001) 무접촉.
+
+on:
+  push:
+    branches: ["2.0"]
+  workflow_dispatch:
+
+concurrency:
+  group: backend-deploy-app
+  cancel-in-progress: true
+
+env:
+  APP_DIR: /home/ec2-user/hailmary-backend-app
+  UV_BIN: /home/ec2-user/.local/bin/uv
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, hailmary-backend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync source to ${{ env.APP_DIR }}
+        run: |
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.venv' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='fortuneteller-main' \
+            --exclude='fortuneteller-main.zip' \
+            --exclude='docker-compose.yml' \
+            --exclude='.env*' \
+            ./ "$APP_DIR/"
+
+      # .env.app 을 시크릿에서 재작성.
+      # 앱 특화값은 하드코딩, 나머지는 기존 staging 시크릿 재사용(새 시크릿 0개).
+      - name: Write .env.app
+        run: |
+          umask 077
+          cat > "$APP_DIR/.env.app" <<EOF
+          APP_ENV=test
+          DATABASE_URL=mysql+asyncmy://${{ secrets.MYSQL_USER }}:${{ secrets.MYSQL_PASSWORD }}@127.0.0.1:3307/hailmary_2_0
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE=hailmary_2_0
+          MYSQL_USER=${{ secrets.MYSQL_USER }}
+          FORTUNETELLER_URL=${{ secrets.FORTUNETELLER_URL }}
+          JWT_SECRET=${{ secrets.STAGING_JWT_SECRET }}
+          KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
+          KAKAO_CLIENT_SECRET=${{ secrets.KAKAO_CLIENT_SECRET }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          PAYAPP_USERID=${{ secrets.PAYAPP_USERID }}
+          PAYAPP_LINKKEY=${{ secrets.PAYAPP_LINKKEY }}
+          PAYAPP_LINKVAL=${{ secrets.PAYAPP_LINKVAL }}
+          PAYAPP_FEEDBACK_URL=${{ secrets.STAGING_PAYAPP_FEEDBACK_URL }}
+          PAYAPP_RETURN_URL=${{ secrets.STAGING_PAYAPP_RETURN_URL }}
+          FRONTEND_BASE_URL=https://app.dohwaseonsaju.com
+          AMPLITUDE_API_KEY=${{ secrets.STAGING_AMPLITUDE_API_KEY }}
+          AMPLITUDE_BASE_URL=${{ secrets.AMPLITUDE_BASE_URL }}
+          CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
+          CLAUDE_MODEL=${{ secrets.CLAUDE_MODEL }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          AWS_SES_SENDER=${{ secrets.AWS_SES_SENDER }}
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          QA_USERNAME=${{ secrets.QA_USERNAME }}
+          QA_PASSWORD=${{ secrets.QA_PASSWORD }}
+          QA_ACCESS_TOKEN=${{ secrets.QA_ACCESS_TOKEN }}
+          REDIS_URL=redis://127.0.0.1:6379/2
+          CACHE_ENABLED=true
+          CHAT_ENABLED=true
+          TEST_LOGIN_ENABLED=${{ secrets.TEST_LOGIN_ENABLED }}
+          TEST_LOGIN_USERNAME=${{ secrets.TEST_LOGIN_USERNAME }}
+          TEST_LOGIN_PASSWORD=${{ secrets.TEST_LOGIN_PASSWORD }}
+          PORTONE_ENABLED=${{ secrets.PORTONE_ENABLED }}
+          PORTONE_API_SECRET=${{ secrets.PORTONE_API_SECRET }}
+          PORTONE_STORE_ID=${{ secrets.PORTONE_STORE_ID }}
+          PORTONE_CHANNEL_KEY=${{ secrets.PORTONE_CHANNEL_KEY }}
+          PORTONE_WEBHOOK_SECRET=${{ secrets.PORTONE_WEBHOOK_SECRET }}
+          PORTONE_ALLOW_TEST_CHANNEL=${{ secrets.PORTONE_ALLOW_TEST_CHANNEL }}
+          EOF
+
+      - name: Install dependencies (uv sync)
+        working-directory: ${{ env.APP_DIR }}
+        run: $UV_BIN sync --frozen
+
+      - name: Run database migrations
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -a
+          . "$APP_DIR/.env.app"
+          set +a
+          $UV_BIN run alembic upgrade head
+
+      # kkebi 무료사주 70개 daily 템플릿 시드 (idempotent upsert)
+      - name: Seed 70 daily templates (idempotent upsert)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -a
+          . "$APP_DIR/.env.app"
+          set +a
+          $UV_BIN run python -X utf8 -m scripts.kkebi_gen.load_to_db
+
+      - name: Restart app backend service
+        run: sudo /usr/bin/systemctl restart hailmary-backend-app.service
+
+      - name: Wait for /health (local 8002)
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8002/health || true)
+            if [ "$code" = "200" ]; then
+              echo "App 2.0 backend healthy"
+              exit 0
+            fi
+            echo "[$i/30] status=$code, retry in 2s"
+            sleep 2
+          done
+          echo "::error::App 2.0 backend did not become healthy in 60s"
+          sudo /usr/bin/journalctl -u hailmary-backend-app.service --since '2 minutes ago' --no-pager | tail -80
+          exit 1
