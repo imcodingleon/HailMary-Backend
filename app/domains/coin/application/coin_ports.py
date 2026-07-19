@@ -1,0 +1,19 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Protocol
+
+from app.domains.coin.domain.entity.coin_models import CoinLot, SpendPlan, Wallet
+
+
+class CoinLedgerPort(Protocol):
+    async def get_wallet(self, account_id: int) -> Wallet | None: ...
+    async def get_wallet_for_update(self, account_id: int) -> Wallet | None: ...
+    async def get_active_lots_for_update(
+        self, account_id: int, now: datetime
+    ) -> list[CoinLot]: ...
+    async def create_wallet_with_lot(self, lot: CoinLot) -> Wallet: ...
+    async def apply_spend(
+        self, account_id: int, plan: SpendPlan, ref: str, tx_type: str
+    ) -> int: ...
+    async def expire_stale_lots(self, account_id: int, now: datetime) -> int: ...
