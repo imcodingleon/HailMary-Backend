@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any, cast
 
-from sqlalchemy import or_, select
+from sqlalchemy import CursorResult, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.coin.application.coin_ports import CoinLedgerPort
@@ -50,6 +51,22 @@ class CoinRepository(CoinLedgerPort):
         )
         orm = result.scalar_one_or_none()
         return CoinMapper.wallet_to_entity(orm) if orm else None
+
+    async def get_available_balance(self, account_id: int, now: datetime) -> int:
+        """live 소비가능 잔액 = ACTIVE·미만료 lot들의 remaining_amount 합.
+
+        순수 읽기 — 락도, 쓰기도 없다. 잔액조회(GET)가 원장을 변형하지 않도록
+        balance 스냅샷 대신 lot 합을 직접 계산한다. lot이 없으면 SUM은
+        coalesce로 0을 돌려준다.
+        """
+        result = await self._session.execute(
+            select(func.coalesce(func.sum(CoinLotORM.remaining_amount), 0)).where(
+                CoinLotORM.account_id == account_id,
+                CoinLotORM.status == "ACTIVE",
+                or_(CoinLotORM.expires_at.is_(None), CoinLotORM.expires_at > now),
+            )
+        )
+        return int(result.scalar_one())
 
     async def get_active_lots_for_update(
         self, account_id: int, now: datetime
@@ -154,7 +171,14 @@ class CoinRepository(CoinLedgerPort):
         return wallet_orm.balance
 
     async def expire_stale_lots(self, account_id: int, now: datetime) -> int:
-        """만료된 ACTIVE lot -> EXPIRED(remaining=0) + EXPIRE tx(봉투당) + balance 차감."""
+        """만료된 ACTIVE lot -> EXPIRED(remaining=0) + EXPIRE tx(봉투당) + balance 차감.
+
+        이 메서드는 항상 wallet 행 락을 보유한 상태에서만 호출된다(spend/sweep).
+        balance 는 절대값 대입이 아니라 상대 SQL 차감(``balance = balance - freed``)
+        으로 갱신해, 동일 트랜잭션 내 여러 봉투 만료가 합성(compose)되게 한다.
+        lot 전이는 ``WHERE id AND status=='ACTIVE'`` 로 가드해, 이미 만료된 lot을
+        재차 EXPIRE 하지 않는다(rowcount!=1 이면 skip).
+        """
         result = await self._session.execute(
             select(CoinLotORM).where(
                 CoinLotORM.account_id == account_id,
@@ -165,13 +189,28 @@ class CoinRepository(CoinLedgerPort):
         )
         stale = result.scalars().all()
         wallet_orm = await self._get_wallet_orm(account_id)
+        running = wallet_orm.balance if wallet_orm is not None else 0
 
         for lot_orm in stale:
             freed = lot_orm.remaining_amount
-            lot_orm.status = "EXPIRED"
-            lot_orm.remaining_amount = 0
+            transitioned = cast(
+                "CursorResult[Any]",
+                await self._session.execute(
+                    update(CoinLotORM)
+                    .where(CoinLotORM.id == lot_orm.id, CoinLotORM.status == "ACTIVE")
+                    .values(status="EXPIRED", remaining_amount=0)
+                ),
+            )
+            if transitioned.rowcount != 1:
+                # 동시 writer가 이미 만료 처리 — 이중 EXPIRE/이중 차감 방지
+                continue
             if wallet_orm is not None and freed > 0:
-                wallet_orm.balance -= freed
+                running -= freed
+                await self._session.execute(
+                    update(CoinWalletORM)
+                    .where(CoinWalletORM.account_id == account_id)
+                    .values(balance=CoinWalletORM.balance - freed)
+                )
                 self._session.add(
                     CoinTransactionORM(
                         account_id=account_id,
@@ -179,12 +218,18 @@ class CoinRepository(CoinLedgerPort):
                         delta=-freed,
                         lot_id=lot_orm.id,
                         ref=None,  # 배치 만료 — 외부 idempotency key 없음
-                        balance_after=wallet_orm.balance,
+                        balance_after=running,
                     )
                 )
 
         await self._session.flush()
-        return wallet_orm.balance if wallet_orm is not None else 0
+        if wallet_orm is not None:
+            # Core update()로 DB balance만 상대 차감했으므로 identity-map의
+            # in-memory balance는 아직 옛 값이다. 만료된다(expire). 뒤이어
+            # apply_spend가 같은 wallet_orm.balance를 읽을 때 차감 반영본을
+            # 재로딩하도록 강제해, 만료 차감이 spend에 의해 덮어써지지 않게 한다.
+            self._session.expire(wallet_orm, ["balance"])
+        return running
 
     async def accounts_with_stale_lots(self, now: datetime) -> list[int]:
         """만료 대상(ACTIVE + expires_at 통과) lot이 하나라도 있는 account_id 목록."""

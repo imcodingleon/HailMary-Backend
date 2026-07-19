@@ -21,6 +21,16 @@ class FakeLedger(CoinLedgerPort):
     async def get_wallet_for_update(self, account_id):
         return self.wallets.get(account_id)
 
+    async def get_available_balance(self, account_id, now):
+        # ACTIVE·미만료 lot들의 remaining 합 (repo SQL과 동일 조건).
+        return sum(
+            lot.remaining_amount
+            for lot in self.lots
+            if lot.account_id == account_id
+            and lot.status == "ACTIVE"
+            and (lot.expires_at is None or lot.expires_at > now)
+        )
+
     async def get_active_lots_for_update(self, account_id, now):
         return [
             lot

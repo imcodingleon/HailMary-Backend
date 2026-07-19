@@ -2,7 +2,7 @@
 
 coin_wallets: 계정당 1건, 잔액 스냅샷.
 coin_lots: FIFO 소비 대상 코인 배치. UNIQUE(source_reason, ref)로 GRANT 멱등 보장.
-coin_transactions: 원장. UNIQUE(type, ref)로 CHARGE/SPEND 등 멱등 보장
+coin_transactions: 원장. UNIQUE(account_id, type, ref)로 CHARGE/SPEND 등 계정 단위 멱등 보장
 (MySQL은 NULL을 서로 다른 값으로 취급하므로 ref가 NULL인 행끼리는 중복 허용됨 — GRANT 초기 등은 ref 규칙 준수 전제).
 
 Revision ID: 015_add_coin_tables
@@ -98,7 +98,9 @@ def upgrade() -> None:
             ["lot_id"], ["coin_lots.id"], name="fk_coin_transactions_lot_id"
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("type", "ref", name="uq_coin_tx_type_ref"),
+        sa.UniqueConstraint(
+            "account_id", "type", "ref", name="uq_coin_tx_account_type_ref"
+        ),
     )
     op.create_index(
         "ix_coin_transactions_account_id", "coin_transactions", ["account_id"], unique=False

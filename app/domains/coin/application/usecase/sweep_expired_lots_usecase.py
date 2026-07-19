@@ -26,5 +26,8 @@ class SweepExpiredLotsUseCase:
         now = self._now()
         account_ids = await self._ledger.accounts_with_stale_lots(now)
         for account_id in account_ids:
+            # 계정 wallet 행 락 선점 — sweep 만료가 동시 spend와 직렬화되게 한다.
+            # (락은 트랜잭션 종료 시 해제된다.)
+            await self._ledger.get_wallet_for_update(account_id)
             await self._ledger.expire_stale_lots(account_id, now)
         return len(account_ids)

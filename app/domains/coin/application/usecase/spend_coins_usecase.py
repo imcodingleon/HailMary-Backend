@@ -22,8 +22,8 @@ class SpendCoinsUseCase:
 
     async def spend(self, account_id: int, cost: int, ref: str) -> int:
         now = self._now()
-        await self._ledger.expire_stale_lots(account_id, now)
-        await self._ledger.get_wallet_for_update(account_id)  # 계정 행 잠금
+        await self._ledger.get_wallet_for_update(account_id)  # 락 선점 (만료보다 먼저)
+        await self._ledger.expire_stale_lots(account_id, now)  # 이제 락 보유 하에 만료
         lots = await self._ledger.get_active_lots_for_update(account_id, now)
         plan = self._policy.plan_spend(lots, cost, now)  # 부족 시 InsufficientCoinsError
         return await self._ledger.apply_spend(

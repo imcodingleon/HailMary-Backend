@@ -68,7 +68,11 @@ class CoinLotORM(Base):
 
 class CoinTransactionORM(Base):
     __tablename__ = "coin_transactions"
-    __table_args__ = (UniqueConstraint("type", "ref", name="uq_coin_tx_type_ref"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "account_id", "type", "ref", name="uq_coin_tx_account_type_ref"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     account_id: Mapped[int] = mapped_column(

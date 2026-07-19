@@ -34,7 +34,8 @@ class CoinSpendingPolicy:
             if left <= 0:
                 break
             take = min(lot.remaining_amount, left)
-            assert lot.id is not None
+            if lot.id is None:
+                raise ValueError("spendable lot missing id")
             plan.draws.append(SpendDraw(lot_id=lot.id, amount=take))
             left -= take
         return plan

@@ -53,3 +53,15 @@ def test_insufficient_raises():
         CoinSpendingPolicy().plan_spend([a], cost=10, now=NOW)
     assert exc.value.available == 5
     assert exc.value.required == 10
+
+
+def test_cost_zero_raises_value_error():
+    a = _lot(1, 100, datetime(2026, 7, 1, tzinfo=UTC))
+    with pytest.raises(ValueError):
+        CoinSpendingPolicy().plan_spend([a], cost=0, now=NOW)
+
+
+def test_cost_negative_raises_value_error():
+    a = _lot(1, 100, datetime(2026, 7, 1, tzinfo=UTC))
+    with pytest.raises(ValueError):
+        CoinSpendingPolicy().plan_spend([a], cost=-5, now=NOW)
