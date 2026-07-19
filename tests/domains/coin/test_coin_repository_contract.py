@@ -68,6 +68,15 @@ class FakeLedger(CoinLedgerPort):
             self.wallets[account_id].balance -= freed
         return self.wallets[account_id].balance if account_id in self.wallets else 0
 
+    async def accounts_with_stale_lots(self, now):
+        return sorted(
+            {
+                lot.account_id
+                for lot in self.lots
+                if lot.status == "ACTIVE" and lot.is_expired(now=now)
+            }
+        )
+
 
 @pytest.mark.asyncio
 async def test_fake_ledger_grant_then_spend():

@@ -185,3 +185,16 @@ class CoinRepository(CoinLedgerPort):
 
         await self._session.flush()
         return wallet_orm.balance if wallet_orm is not None else 0
+
+    async def accounts_with_stale_lots(self, now: datetime) -> list[int]:
+        """만료 대상(ACTIVE + expires_at 통과) lot이 하나라도 있는 account_id 목록."""
+        result = await self._session.execute(
+            select(CoinLotORM.account_id)
+            .where(
+                CoinLotORM.status == "ACTIVE",
+                CoinLotORM.expires_at.is_not(None),
+                CoinLotORM.expires_at <= now,
+            )
+            .distinct()
+        )
+        return [row for row in result.scalars().all()]
