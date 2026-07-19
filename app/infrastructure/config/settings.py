@@ -79,6 +79,16 @@ class Settings(BaseSettings):
     chat_history_window: int = 20       # 최근 N턴만 컨텍스트로 (Phase 2부터 서버 이력 권위)
     chat_temperature: float = 0.85
     chat_saju_cache_ttl_seconds: int = 60 * 60 * 24 * 90  # 90일 (사주 불변, 안전 상한)
+    # 도화선 2.0 코인 (Phase 2, SSOT=PG_SSOT.md). coin_enabled=False면 /api/coins/* 미등록 +
+    # 가입 지급 훅 비활성 — 기존 로그인/결제 플로 무영향.
+    coin_enabled: bool = False
+    coin_signup_grant: int = 30
+    coin_signup_expiry_days: int = 30
+    coin_paid_expiry_days: int = 1825
+    love_report_coin_cost: int = 490
+    chat_personal_coin_cost: int = 1
+    chat_saju_coin_cost: int = 5
+    coin_refund_window_days: int = 7
 
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE, env_file_encoding="utf-8", extra="ignore"

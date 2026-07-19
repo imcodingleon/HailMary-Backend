@@ -194,6 +194,18 @@ from app.domains.chat.application.usecase.stream_chat_usecase import StreamChatU
 from app.domains.chat.application.usecase.stream_room_chat_usecase import (
     StreamRoomChatUseCase,
 )
+from app.domains.coin.adapter.inbound.api.coin_router import (
+    get_balance_usecase,
+)
+from app.domains.coin.adapter.inbound.api.coin_router import (
+    router as coin_router,
+)
+from app.domains.coin.adapter.outbound.persistence.coin_repository import CoinRepository
+from app.domains.coin.adapter.outbound.signup_bonus_adapter import CoinSignupBonusAdapter
+from app.domains.coin.application.usecase.get_balance_usecase import GetBalanceUseCase
+from app.domains.coin.application.usecase.grant_signup_coins_usecase import (
+    GrantSignupCoinsUseCase,
+)
 from app.domains.kkebi.adapter.inbound.api.kkebi_router import (
     get_daily_fortune_usecase,
     get_saved_daily_result_usecase,
@@ -407,6 +419,20 @@ def _build_oauth_clients() -> dict[Provider, OAuthClientPort]:
 _oauth_clients: dict[Provider, OAuthClientPort] = _build_oauth_clients()
 
 
+def _make_signup_bonus(session: AsyncSession) -> CoinSignupBonusAdapter | None:
+    """coin_enabled일 때만 가입 지급 훅 어댑터를 만든다 — 로그인 usecase와 **같은 session**을
+    공유해 지급이 로그인 트랜잭션 안에서 커밋되게 한다(Task 7 세션 공유 요구사항).
+    """
+    if not _settings.coin_enabled:
+        return None
+    grant_usecase = GrantSignupCoinsUseCase(
+        ledger=CoinRepository(session),
+        grant_amount=_settings.coin_signup_grant,
+        expiry_days=_settings.coin_signup_expiry_days,
+    )
+    return CoinSignupBonusAdapter(grant_usecase)
+
+
 def _make_social_login_usecase(
     session: AsyncSession = Depends(_get_session),
 ) -> SocialLoginUseCase:
@@ -414,6 +440,7 @@ def _make_social_login_usecase(
         oauth_clients=_oauth_clients,
         account_repo=AccountRepository(session),
         token_issuer=_get_token_provider(),
+        signup_bonus=_make_signup_bonus(session),
     )
 
 
@@ -427,6 +454,7 @@ def _make_test_login_usecase(
         enabled=_settings.test_login_enabled,
         username=_settings.test_login_username,
         password=_settings.test_login_password,
+        signup_bonus=_make_signup_bonus(session),
     )
 
 
@@ -985,6 +1013,21 @@ def _make_save_saju_profile_usecase(
     )
 
 
+# ── Coin Domain UseCase 팩토리 (도화선 2.0, Phase 2) ──────────────────────────
+# coin_enabled=True 일 때만 라우터가 등록되므로(아래) 이 팩토리는 그 경우에만 호출된다.
+
+def _make_coin_repository(
+    session: AsyncSession = Depends(_get_session),
+) -> CoinRepository:
+    return CoinRepository(session)
+
+
+def _make_get_balance_usecase(
+    repo: CoinRepository = Depends(_make_coin_repository),
+) -> GetBalanceUseCase:
+    return GetBalanceUseCase(ledger=repo)
+
+
 # ── 의존성 오버라이드 ──────────────────────────────────────────────────────────
 
 app.dependency_overrides[get_user_repository] = _make_user_repository
@@ -1018,6 +1061,7 @@ app.dependency_overrides[get_open_chat_room_usecase] = _make_open_chat_room_usec
 app.dependency_overrides[get_list_chat_messages_usecase] = _make_list_chat_messages_usecase
 app.dependency_overrides[get_saju_profile_usecase] = _make_get_saju_profile_usecase
 app.dependency_overrides[get_save_saju_profile_usecase] = _make_save_saju_profile_usecase
+app.dependency_overrides[get_balance_usecase] = _make_get_balance_usecase
 
 app.include_router(user_router)
 app.include_router(auth_router)
@@ -1032,6 +1076,9 @@ app.include_router(kkebi_router)
 # staging은 main push 자동 배포라 이 게이트가 미완성 노출 방어선 (CHAT_SSOT.md).
 if _settings.chat_enabled:
     app.include_router(chat_router)
+# 도화선 2.0 코인 — coin_enabled=True 일 때만 등록 (미설정 시 /api/coins/* 404, 완전 차단).
+if _settings.coin_enabled:
+    app.include_router(coin_router)
 app.include_router(paid_report_share_router)
 # 무료 쿠폰 — dev bypass 와 달리 환경 가드 없이 항상 등록(prod 포함).
 # 유효 쿠폰 코드 자체가 가드 역할 → _DEV_BYPASS_ENVS 분기에 넣지 말 것.
