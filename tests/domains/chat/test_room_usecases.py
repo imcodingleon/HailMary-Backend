@@ -94,10 +94,14 @@ class FakeTurnStore:
         character: ChatCharacter,
         history: list[ChatMessage],
         saju_raw: dict[str, object] | None = None,
+        cost: int = 0,
+        balance: int | None = None,
     ) -> None:
         self._character = character
         self._history = history
         self._saju_raw = saju_raw
+        self._cost = cost
+        self._balance = balance
         self.begin_calls: list[dict[str, object]] = []
         self.completed: list[dict[str, object]] = []
 
@@ -111,6 +115,7 @@ class FakeTurnStore:
         return TurnBegin(
             character=self._character, user_message_id=10,
             history=self._history, saju_raw=self._saju_raw,
+            cost=self._cost, balance=self._balance,
         )
 
     async def complete_turn(
@@ -298,6 +303,57 @@ async def test_saju_mode_without_profile_falls_back_to_text() -> None:
     assert [e.event for e in events] == ["start", "delta", "delta", "done"]
     assert client.saju_calls == 0  # 프로필 없으면 구조화 블록 미호출
     assert store.completed[0]["msg_type"] == "text"
+
+
+async def test_stream_emits_usage_event_when_cost_positive() -> None:
+    # 코인 차감 발생(coin_enabled=True) → done 직전에 usage 이벤트 (CHAT_SSOT.md SSE 계약).
+    store = FakeTurnStore(
+        character=ChatCharacter.YEONU, history=[], cost=1, balance=29,
+    )
+    client = FakeChatClient(["그래", "서?"])
+    usecase = _stream_usecase(client, store)
+    req = SendRoomMessageRequest(mode=ChatMode.CASUAL, content="고민 있어.")
+
+    begin = await usecase.begin(room_id=5, account_id=1, request=req)
+    events = [ev async for ev in usecase.stream(room_id=5, begin=begin, request=req)]
+
+    assert [e.event for e in events] == ["start", "delta", "delta", "usage", "done"]
+    assert events[-2].data == {"cost": 1, "balance": 29}
+
+
+async def test_stream_omits_usage_event_when_cost_zero() -> None:
+    # coin_enabled=False(factory 미주입) → TurnBegin.cost=0 → usage 이벤트 자체가 없다.
+    store = FakeTurnStore(character=ChatCharacter.YEONU, history=[], cost=0, balance=None)
+    client = FakeChatClient(["그래", "서?"])
+    usecase = _stream_usecase(client, store)
+    req = SendRoomMessageRequest(mode=ChatMode.CASUAL, content="고민 있어.")
+
+    begin = await usecase.begin(room_id=5, account_id=1, request=req)
+    events = [ev async for ev in usecase.stream(room_id=5, begin=begin, request=req)]
+
+    assert [e.event for e in events] == ["start", "delta", "delta", "done"]
+
+
+async def test_saju_block_emits_usage_event_before_done_when_cost_positive() -> None:
+    block = {
+        "kind": "yeonu",
+        "scene": "달빛 아래 붉은 실이 보여.",
+        "evidence": [{"hanja": "丙火(병화)", "element": "화(火)", "note": "정열의 기운"}],
+        "advice": "먼저 다가가도 좋아.",
+    }
+    store = FakeTurnStore(
+        character=ChatCharacter.YEONU, history=[], saju_raw={"day": {"stem": "병"}},
+        cost=5, balance=24,
+    )
+    client = FakeChatClient([], saju_block=block)
+    usecase = _stream_usecase(client, store)
+    req = SendRoomMessageRequest(mode=ChatMode.SAJU, content="내 연애운 봐줘.")
+
+    begin = await usecase.begin(room_id=5, account_id=1, request=req)
+    events = [ev async for ev in usecase.stream(room_id=5, begin=begin, request=req)]
+
+    assert [e.event for e in events] == ["start", "saju_block", "usage", "done"]
+    assert events[-2].data == {"cost": 5, "balance": 24}
 
 
 async def test_saju_block_error_skips_persistence() -> None:

@@ -13,6 +13,8 @@ class TurnBegin:
     user_message_id: int
     history: list[ChatMessage]  # user 메시지 직전까지, 오래된 순
     saju_raw: dict[str, Any] | None = None  # 계정 사주 프로필(있으면) — 프롬프트 컨텍스트용
+    cost: int = 0  # 이번 턴 코인 차감액 (coin_enabled=False/factory 미주입이면 0)
+    balance: int | None = None  # 차감 후 잔액 (차감 미발생이면 None)
 
 
 class ChatTurnStorePort(Protocol):

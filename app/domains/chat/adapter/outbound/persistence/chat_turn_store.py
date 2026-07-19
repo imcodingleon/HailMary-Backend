@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.chat.domain.entity.chat_message import ChatMessage
+from app.domains.chat.domain.port.chat_coin_spend_port import ChatCoinSpendPort
 from app.domains.chat.domain.port.chat_turn_store_port import TurnBegin
 from app.domains.chat.domain.port.conversation_repository_port import (
     ConversationNotFoundError,
@@ -25,10 +26,26 @@ class ChatTurnStore:
     요청 세션(`_get_session`, 요청당 단일 트랜잭션)을 스트림 수명 동안 잡지 않기 위해
     각 메서드가 session_factory로 자체 세션을 열고 원자 커밋한다
     (main.py `_compose_report_background` 패턴, CHAT_SSOT.md SSE 계약 §코인 선차감-환불).
+
+    코인 선차감(P4-step-1): coin_spend_factory가 주어지면(coin_enabled=True) user
+    메시지 INSERT와 **같은** session.begin() 블록 안에서 코인을 소진한다 — 부족 시
+    InsufficientCoinsError가 전파되며 해당 트랜잭션(방금 flush한 user 메시지 포함)이
+    통째로 롤백돼 유령(orphan) 메시지가 남지 않는다. factory=None(coin_enabled=False)
+    이면 소진 자체를 건너뛰어 채팅이 무료로 동작한다.
     """
 
-    def __init__(self, session_factory: Callable[[], AsyncSession]) -> None:
+    def __init__(
+        self,
+        session_factory: Callable[[], AsyncSession],
+        *,
+        personal_cost: int = 0,
+        saju_cost: int = 0,
+        coin_spend_factory: Callable[[AsyncSession], ChatCoinSpendPort] | None = None,
+    ) -> None:
         self._session_factory = session_factory
+        self._personal_cost = personal_cost
+        self._saju_cost = saju_cost
+        self._coin_spend_factory = coin_spend_factory
 
     async def begin_turn(
         self,
@@ -75,7 +92,20 @@ class ChatTurnStore:
             )
             session.add(user_orm)
             conv.last_message_at = datetime.now()
-            await session.flush()
+            await session.flush()  # user_orm.id 확보 (아래 코인 ref에 필요)
+
+            # 코인 선차감 — user INSERT와 같은 트랜잭션. 부족 시 예외가 여기서 던져지고
+            # session.begin()이 통째로 롤백(위 INSERT도 함께 취소)한다.
+            # ref는 user_message_id 기준 — 빠른 연타 더블클릭은 메시지 2개=차감 2회로
+            # 별도 턴 취급한다(연애운 Unit B와 동일 클래스의 더블서브밋, P5 검토 항목).
+            cost = 0
+            balance: int | None = None
+            if self._coin_spend_factory is not None:
+                cost = self._personal_cost if mode == ChatMode.CASUAL else self._saju_cost
+                coin_spend = self._coin_spend_factory(session)
+                balance = await coin_spend.spend(
+                    account_id, cost, ref=f"chat_turn:{user_orm.id}"
+                )
 
             # 계정 사주 프로필(있으면) 동승 — 프롬프트 컨텍스트 주입용 (H2/H3)
             saju_raw = (
@@ -91,6 +121,8 @@ class ChatTurnStore:
                 user_message_id=user_orm.id,
                 history=history,
                 saju_raw=saju_raw,
+                cost=cost,
+                balance=balance,
             )
 
     async def complete_turn(

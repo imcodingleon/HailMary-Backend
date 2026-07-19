@@ -26,10 +26,13 @@ class StreamRoomChatUseCase:
     """방 기준 채팅 1턴 스트리밍 + 영속화 (Phase 2).
 
     2단 구조 (라우터 계약):
-      1) begin()  — 스트림 시작 전. 소유 검증 + user 메시지 저장.
-         실패는 예외로 → 라우터가 일반 상태코드(404 등) 반환. (Phase 4에서 코인 선차감이 여기 붙음)
-      2) stream() — SSE 이벤트 제너레이터. 성공 종료 시 캐릭터 메시지 영속화.
-         에러 시 캐릭터 메시지 저장 없음 (부분 응답 정책 = TBD-D, Phase 4에서 재검토).
+      1) begin()  — 스트림 시작 전. 소유 검증 + user 메시지 저장 + 코인 선차감(P4-step-1,
+         ChatTurnStore.begin_turn 안에서 원자 처리). 실패는 예외로 → 라우터가 일반
+         상태코드(404/402 등) 반환.
+      2) stream() — SSE 이벤트 제너레이터. cost>0이면 done 직전 usage 이벤트 emit.
+         성공 종료 시 캐릭터 메시지 영속화. 에러 시 캐릭터 메시지 저장 없음
+         (부분 응답 정책 = TBD-D, Phase 4에서 재검토). 스트림 실패로 캐릭터 메시지가
+         저장되지 않아도 이미 선차감된 코인은 환불되지 않는다(환불 미구현, P5/TBD-D 갭).
     """
 
     def __init__(
@@ -108,6 +111,10 @@ class StreamRoomChatUseCase:
         message_id = await self._turn_store.complete_turn(
             conversation_id=room_id, content=strip_info_tail(acc).strip(), mode=request.mode
         )
+        if begin.cost > 0:
+            yield ChatStreamEvent(
+                event="usage", data={"cost": begin.cost, "balance": begin.balance}
+            )
         yield ChatStreamEvent(
             event="done", data={"stop_reason": "end_turn", "message_id": message_id}
         )
@@ -147,6 +154,10 @@ class StreamRoomChatUseCase:
             msg_type="saju",
             saju_block=block,
         )
+        if begin.cost > 0:
+            yield ChatStreamEvent(
+                event="usage", data={"cost": begin.cost, "balance": begin.balance}
+            )
         yield ChatStreamEvent(
             event="done", data={"stop_reason": "tool_use", "message_id": message_id}
         )

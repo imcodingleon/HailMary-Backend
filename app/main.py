@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections.abc import AsyncGenerator, Coroutine
+from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import datetime
 from typing import Any
 
@@ -200,6 +200,7 @@ from app.domains.coin.adapter.inbound.api.coin_router import (
 from app.domains.coin.adapter.inbound.api.coin_router import (
     router as coin_router,
 )
+from app.domains.coin.adapter.outbound.chat_coin_spend_adapter import ChatCoinSpendAdapter
 from app.domains.coin.adapter.outbound.payment_coin_spend_adapter import (
     PaymentCoinSpendAdapter,
 )
@@ -1012,8 +1013,27 @@ def _make_stream_chat_usecase() -> StreamChatUseCase:
     )
 
 
+# 코인 선차감 팩토리 (P4-step-1) — coin_enabled=True 일 때만 주입, 아니면 채팅은 무료
+# (ChatTurnStore.begin_turn이 factory=None이면 소진을 건너뛴다). ChatCoinSpendAdapter는
+# begin_turn의 원자 세션에 바인딩되어야 하므로 세션을 받는 팩토리 형태로 넘긴다
+# (연애운 _make_spend_love_report_usecase와 동일 조립, 세션만 다름).
+_chat_coin_spend_factory: Callable[[AsyncSession], ChatCoinSpendAdapter] | None = (
+    (
+        lambda session: ChatCoinSpendAdapter(
+            SpendCoinsUseCase(ledger=CoinRepository(session), policy=CoinSpendingPolicy())
+        )
+    )
+    if _settings.coin_enabled
+    else None
+)
+
 # 스트리밍 턴 영속화 — 요청 세션이 아닌 자체 단명 세션 (CHAT_SSOT.md SSE 계약).
-_chat_turn_store = ChatTurnStore(AsyncSessionLocal)
+_chat_turn_store = ChatTurnStore(
+    AsyncSessionLocal,
+    personal_cost=_settings.chat_personal_coin_cost,
+    saju_cost=_settings.chat_saju_coin_cost,
+    coin_spend_factory=_chat_coin_spend_factory,
+)
 
 
 def _make_stream_room_chat_usecase() -> StreamRoomChatUseCase:

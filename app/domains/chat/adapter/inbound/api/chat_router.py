@@ -42,6 +42,7 @@ from app.domains.chat.application.usecase.stream_room_chat_usecase import (
 from app.domains.chat.domain.port.conversation_repository_port import (
     ConversationNotFoundError,
 )
+from app.domains.coin.domain.error import InsufficientCoinsError
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -144,12 +145,14 @@ async def send_room_message(
 ) -> StreamingResponse:
     """방 기준 1턴 전송 — SSE 스트리밍 + 영속화 (CHAT_SSOT.md SSE 계약).
 
-    스트림 시작 전 오류는 일반 상태코드(404 등). Phase 4에서 402(코인 부족)가 여기 추가.
+    스트림 시작 전 오류는 일반 상태코드(404 존재하지 않는 방, 402 코인 부족).
     """
     try:
         begin = await usecase.begin(room_id=room_id, account_id=account_id, request=body)
     except ConversationNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except InsufficientCoinsError as e:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(e)) from e
 
     async def event_stream() -> AsyncIterator[str]:
         async for ev in usecase.stream(room_id=room_id, begin=begin, request=body):
