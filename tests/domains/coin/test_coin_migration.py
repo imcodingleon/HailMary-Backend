@@ -19,3 +19,11 @@ def test_orm_tables_defined() -> None:
     assert any(
         {"source_reason", "ref"} <= {col.name for col in u.columns} for u in uniques
     )
+
+
+def test_account_id_is_integer_to_match_accounts_id_fk() -> None:
+    # accounts.id is Integer (SQLAlchemy default int mapping); MySQL InnoDB
+    # requires FK column types to match exactly (errno 150 / Error 1215).
+    assert type(CoinWalletORM.__table__.c.account_id.type).__name__ == "Integer"
+    assert type(CoinLotORM.__table__.c.account_id.type).__name__ == "Integer"
+    assert type(CoinTransactionORM.__table__.c.account_id.type).__name__ == "Integer"

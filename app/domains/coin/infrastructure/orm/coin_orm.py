@@ -28,7 +28,7 @@ class CoinWalletORM(Base):
     __tablename__ = "coin_wallets"
 
     account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), primary_key=True
+        Integer, ForeignKey("accounts.id"), primary_key=True
     )
     balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -45,7 +45,7 @@ class CoinLotORM(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False, index=True
+        Integer, ForeignKey("accounts.id"), nullable=False, index=True
     )
     coin_type: Mapped[CoinType] = mapped_column(
         SAEnum(CoinType, values_callable=lambda e: [x.value for x in e]),
@@ -72,7 +72,7 @@ class CoinTransactionORM(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False, index=True
+        Integer, ForeignKey("accounts.id"), nullable=False, index=True
     )
     type: Mapped[TransactionType] = mapped_column(
         SAEnum(TransactionType, values_callable=lambda e: [x.value for x in e]),

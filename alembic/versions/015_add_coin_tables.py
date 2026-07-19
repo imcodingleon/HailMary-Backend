@@ -27,15 +27,15 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "coin_wallets",
-        sa.Column("account_id", sa.BigInteger(), nullable=False),
+        sa.Column("account_id", sa.Integer(), nullable=False),
         sa.Column("balance", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
         sa.Column(
             "updated_at",
             sa.DateTime(),
             server_default=sa.func.now(),
             onupdate=sa.func.now(),
-            nullable=True,
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(
             ["account_id"], ["accounts.id"], name="fk_coin_wallets_account_id"
@@ -45,7 +45,7 @@ def upgrade() -> None:
     op.create_table(
         "coin_lots",
         sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
-        sa.Column("account_id", sa.BigInteger(), nullable=False),
+        sa.Column("account_id", sa.Integer(), nullable=False),
         sa.Column(
             "coin_type", sa.Enum("PAID", "FREE", name="cointype"), nullable=False
         ),
@@ -62,7 +62,7 @@ def upgrade() -> None:
         sa.Column(
             "status", sa.String(length=16), nullable=False, server_default="ACTIVE"
         ),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(
             ["account_id"], ["accounts.id"], name="fk_coin_lots_account_id"
         ),
@@ -78,7 +78,7 @@ def upgrade() -> None:
     op.create_table(
         "coin_transactions",
         sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
-        sa.Column("account_id", sa.BigInteger(), nullable=False),
+        sa.Column("account_id", sa.Integer(), nullable=False),
         sa.Column(
             "type",
             sa.Enum(
@@ -90,7 +90,7 @@ def upgrade() -> None:
         sa.Column("lot_id", sa.BigInteger(), nullable=True),
         sa.Column("ref", sa.String(length=191), nullable=True),
         sa.Column("balance_after", sa.Integer(), nullable=False),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(
             ["account_id"], ["accounts.id"], name="fk_coin_transactions_account_id"
         ),
