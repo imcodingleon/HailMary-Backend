@@ -200,12 +200,17 @@ from app.domains.coin.adapter.inbound.api.coin_router import (
 from app.domains.coin.adapter.inbound.api.coin_router import (
     router as coin_router,
 )
+from app.domains.coin.adapter.outbound.payment_coin_spend_adapter import (
+    PaymentCoinSpendAdapter,
+)
 from app.domains.coin.adapter.outbound.persistence.coin_repository import CoinRepository
 from app.domains.coin.adapter.outbound.signup_bonus_adapter import CoinSignupBonusAdapter
 from app.domains.coin.application.usecase.get_balance_usecase import GetBalanceUseCase
 from app.domains.coin.application.usecase.grant_signup_coins_usecase import (
     GrantSignupCoinsUseCase,
 )
+from app.domains.coin.application.usecase.spend_coins_usecase import SpendCoinsUseCase
+from app.domains.coin.domain.service.spending_policy import CoinSpendingPolicy
 from app.domains.kkebi.adapter.inbound.api.kkebi_router import (
     get_daily_fortune_usecase,
     get_saved_daily_result_usecase,
@@ -224,6 +229,12 @@ from app.domains.kkebi.application.usecase.get_daily_fortune_usecase import (
 )
 from app.domains.kkebi.application.usecase.get_saved_daily_result_usecase import (
     GetSavedDailyResultUseCase,
+)
+from app.domains.payment.adapter.inbound.api.coin_unlock_router import (
+    get_spend_love_report_usecase,
+)
+from app.domains.payment.adapter.inbound.api.coin_unlock_router import (
+    router as coin_unlock_router,
 )
 from app.domains.payment.adapter.inbound.api.coupon_router import (
     get_redeem_coupon_usecase,
@@ -288,6 +299,9 @@ from app.domains.payment.application.usecase.redeem_coupon_usecase import (
 )
 from app.domains.payment.application.usecase.request_payment_usecase import (
     RequestPaymentUseCase,
+)
+from app.domains.payment.application.usecase.spend_love_report_usecase import (
+    SpendLoveReportUseCase,
 )
 from app.domains.payment.application.usecase.update_email_and_resend_usecase import (
     UpdateEmailAndResendUseCase,
@@ -929,6 +943,41 @@ def _make_validate_coupon_usecase(
     return ValidateCouponUseCase(coupon_repo=CouponRepository(session))
 
 
+# ── 연애운 코인 해금 UseCase 팩토리 (도화선 2.0 P4 Unit B) ──────────────────────
+# coin_enabled=True 일 때만 라우터가 등록되므로(아래) 이 팩토리는 그 경우에만 호출된다.
+
+
+def _make_spend_love_report_usecase(
+    session: AsyncSession = Depends(_get_session),
+) -> SpendLoveReportUseCase:
+    """무료 쿠폰(_make_redeem_coupon_usecase)과 동일 조립 + 코인 소진 어댑터 추가.
+
+    코인 repo/usecase는 **같은 요청 세션**으로 구성해 소진(SpendCoinsUseCase)과
+    결제 레코드 생성(grant_paid_report)이 하나의 트랜잭션 경계 안에서 일관되게 처리된다.
+    """
+    user_repo = UserRepository(session)
+    coin_repo = CoinRepository(session)
+    coin_spend = PaymentCoinSpendAdapter(
+        SpendCoinsUseCase(ledger=coin_repo, policy=CoinSpendingPolicy())
+    )
+    # 합성은 백그라운드(자기 세션)에서 — 여기선 analytics/demographics 만 요청 세션으로.
+    analytics = AmplitudeAnalyticsAdapter(
+        client=AmplitudeClient(
+            api_key=_settings.amplitude_api_key,
+            base_url=_settings.amplitude_base_url,
+        ),
+        environment=_settings.app_env,
+    )
+    return SpendLoveReportUseCase(
+        coin_spend=coin_spend,
+        repo=PaymentRepository(session),
+        user_lookup=UserLookupAdapter(user_repo=user_repo),
+        background_composer=_compose_report_background,
+        analytics=analytics,
+        user_demographics=UserDemographicsAdapter(user_repo=user_repo),
+    )
+
+
 # ── AI Domain UseCase 팩토리 ──────────────────────────────────────────────────
 
 def _make_get_paid_report_usecase(
@@ -1062,6 +1111,7 @@ app.dependency_overrides[get_list_chat_messages_usecase] = _make_list_chat_messa
 app.dependency_overrides[get_saju_profile_usecase] = _make_get_saju_profile_usecase
 app.dependency_overrides[get_save_saju_profile_usecase] = _make_save_saju_profile_usecase
 app.dependency_overrides[get_balance_usecase] = _make_get_balance_usecase
+app.dependency_overrides[get_spend_love_report_usecase] = _make_spend_love_report_usecase
 
 app.include_router(user_router)
 app.include_router(auth_router)
@@ -1079,6 +1129,7 @@ if _settings.chat_enabled:
 # 도화선 2.0 코인 — coin_enabled=True 일 때만 등록 (미설정 시 /api/coins/* 404, 완전 차단).
 if _settings.coin_enabled:
     app.include_router(coin_router)
+    app.include_router(coin_unlock_router)
 app.include_router(paid_report_share_router)
 # 무료 쿠폰 — dev bypass 와 달리 환경 가드 없이 항상 등록(prod 포함).
 # 유효 쿠폰 코드 자체가 가드 역할 → _DEV_BYPASS_ENVS 분기에 넣지 말 것.
