@@ -102,13 +102,33 @@ class CoinRepository(CoinLedgerPort):
     async def apply_spend(
         self, account_id: int, plan: SpendPlan, ref: str, tx_type: str
     ) -> int:
-        """draw(봉투)당 lot.remaining_amount 차감 + SPEND tx INSERT, balance -= total.
+        """SPEND 는 연산(operation)당 정확히 tx row 1개, ref에 대해 멱등.
 
-        coin_transactions 는 UNIQUE(type, ref) 제약이 있다 — 한 SpendPlan이 여러
-        lot(봉투)에 걸쳐 있으면 draw마다 별도 tx row가 필요하므로, 저장되는
-        ref는 `f"{ref}:{lot_id}"`로 봉투별로 구분해 유일성을 만족시키면서도
-        같은 요청이 그대로 재시도되면 각 draw 조합이 다시 충돌해 멱등을 지킨다.
+        coin_transactions 는 UNIQUE(type, ref) 제약이 있다 — 이를 연산 단위
+        멱등으로 실제로 활용하려면 재시도 시 ref가 그대로 유지되어야 한다.
+        호출자가 같은 트랜잭션 안에서 이미 get_wallet_for_update 로 지갑 행을
+        잠근 뒤 호출한다는 전제 하에, 먼저 (type, ref) 로 이미 처리된 tx가
+        있는지 조회한다. 있으면 동일 요청의 재시도이므로 lot을 다시 차감하지
+        않고 현재 잔액만 그대로 반환한다. 없으면 draw(봉투)별로
+        lot.remaining_amount 를 차감한 뒤, SPEND tx row를 정확히 1개만
+        INSERT 하고 balance -= total 한다.
         """
+        tx_enum = TransactionType(tx_type)
+
+        wallet_orm = await self._get_wallet_orm(account_id)
+        if wallet_orm is None:
+            raise ValueError(f"coin wallet not found: {account_id}")
+
+        existing = await self._session.execute(
+            select(CoinTransactionORM).where(
+                CoinTransactionORM.account_id == account_id,
+                CoinTransactionORM.type == tx_enum,
+                CoinTransactionORM.ref == ref,
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            return wallet_orm.balance
+
         lot_orms: dict[int, CoinLotORM] = {}
         for draw in plan.draws:
             if draw.lot_id not in lot_orms:
@@ -118,23 +138,17 @@ class CoinRepository(CoinLedgerPort):
                 lot_orms[draw.lot_id] = orm
             lot_orms[draw.lot_id].remaining_amount -= draw.amount
 
-        wallet_orm = await self._get_wallet_orm(account_id)
-        if wallet_orm is None:
-            raise ValueError(f"coin wallet not found: {account_id}")
         wallet_orm.balance -= plan.total
-
-        tx_enum = TransactionType(tx_type)
-        for draw in plan.draws:
-            self._session.add(
-                CoinTransactionORM(
-                    account_id=account_id,
-                    type=tx_enum,
-                    delta=-draw.amount,
-                    lot_id=draw.lot_id,
-                    ref=f"{ref}:{draw.lot_id}",
-                    balance_after=wallet_orm.balance,
-                )
+        self._session.add(
+            CoinTransactionORM(
+                account_id=account_id,
+                type=tx_enum,
+                delta=-plan.total,
+                lot_id=None,
+                ref=ref,
+                balance_after=wallet_orm.balance,
             )
+        )
 
         await self._session.flush()
         return wallet_orm.balance
