@@ -16,6 +16,7 @@ from app.domains.auth.domain.port.account_repository_port import (
     AccountRepositoryPort,
 )
 from app.domains.auth.domain.port.oauth_client_port import OAuthClientPort
+from app.domains.auth.domain.port.signup_bonus_port import SignupBonusPort
 from app.domains.auth.domain.port.token_port import TokenIssuerPort
 from app.domains.auth.domain.value_object.oauth_profile import OAuthProfile
 from app.domains.auth.domain.value_object.provider import Provider
@@ -39,10 +40,12 @@ class SocialLoginUseCase:
         oauth_clients: Mapping[Provider, OAuthClientPort],
         account_repo: AccountRepositoryPort,
         token_issuer: TokenIssuerPort,
+        signup_bonus: SignupBonusPort | None = None,
     ) -> None:
         self._oauth_clients = oauth_clients
         self._account_repo = account_repo
         self._token_issuer = token_issuer
+        self._signup_bonus = signup_bonus
 
     async def execute(self, request: SocialLoginRequest) -> SocialLoginResponse:
         client = self._oauth_clients.get(request.provider)
@@ -85,6 +88,9 @@ class SocialLoginUseCase:
 
         if account.id is None:  # repository save/update 계약 위반 — 방어
             raise RuntimeError("계정 저장 후 id가 없습니다")
+
+        if is_new_account and self._signup_bonus is not None:
+            await self._signup_bonus.grant(account.id)
 
         return SocialLoginResponse(
             access_token=self._token_issuer.issue(account.id),

@@ -25,6 +25,7 @@ from app.domains.auth.domain.port.account_repository_port import (
     AccountAlreadyExistsError,
     AccountRepositoryPort,
 )
+from app.domains.auth.domain.port.signup_bonus_port import SignupBonusPort
 from app.domains.auth.domain.port.token_port import TokenIssuerPort
 from app.domains.auth.domain.value_object.provider import Provider
 
@@ -54,12 +55,14 @@ class TestLoginUseCase:
         enabled: bool,
         username: str | None,
         password: str | None,
+        signup_bonus: SignupBonusPort | None = None,
     ) -> None:
         self._account_repo = account_repo
         self._token_issuer = token_issuer
         self._enabled = enabled
         self._username = username
         self._password = password
+        self._signup_bonus = signup_bonus
 
     async def execute(self, request: TestLoginRequest) -> SocialLoginResponse:
         if not self._enabled or not self._username or not self._password:
@@ -74,6 +77,7 @@ class TestLoginUseCase:
         account = await self._account_repo.find_by_provider_user(
             Provider.TEST, self._PROVIDER_USER_ID
         )
+        is_new_account = False
         if account is None:
             try:
                 account = await self._account_repo.save(
@@ -87,6 +91,7 @@ class TestLoginUseCase:
                         last_login_at=now,
                     )
                 )
+                is_new_account = True
             except AccountAlreadyExistsError:
                 # 동시 첫 로그인 레이스 — 승자가 만든 계정 재조회.
                 account = await self._account_repo.find_by_provider_user(
@@ -98,6 +103,9 @@ class TestLoginUseCase:
 
         if account is None or account.id is None:
             raise RuntimeError("테스트 계정 생성/조회 실패")
+
+        if is_new_account and self._signup_bonus is not None:
+            await self._signup_bonus.grant(account.id)
 
         return SocialLoginResponse(
             access_token=self._token_issuer.issue(account.id),
