@@ -57,6 +57,18 @@ class TestAccountCheckerPort(Protocol):
     async def is_test_account(self, account_id: int | None) -> bool: ...
 
 
+class CoinSpendPort(Protocol):
+    """코인 소진 hook — 연애운 코인 해금(P4 Unit B) 이 사용.
+
+    payment 도메인은 coin 도메인을 직접 import하지 않는다. main.py가
+    PaymentCoinSpendAdapter(SpendCoinsUseCase 래핑)를 어댑터로 주입.
+    잔액 부족 시 coin 도메인의 InsufficientCoinsError 를 그대로 전파한다
+    (라우터에서 402로 매핑).
+    """
+
+    async def spend(self, account_id: int, cost: int, ref: str) -> int: ...
+
+
 class UserDemographicsPort(Protocol):
     """user_id로 분석용 인구통계(gender / birth_year)를 조회하는 hook.
 

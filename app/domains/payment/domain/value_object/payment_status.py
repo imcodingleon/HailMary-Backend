@@ -29,4 +29,5 @@ class PaymentMethod(str, Enum):
     VIRTUAL_ACCOUNT = "VIRTUAL_ACCOUNT"
     MOBILE_PHONE = "MOBILE_PHONE"
     OTHER = "OTHER"
+    COIN = "COIN"  # 도화선 2.0 연애운 코인 해금 (P4 Unit B) — KRW 미발생, 분석 구분용
 
