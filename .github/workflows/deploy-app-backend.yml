@@ -77,6 +77,10 @@ jobs:
           REDIS_URL=redis://127.0.0.1:6379/2
           CACHE_ENABLED=true
           CHAT_ENABLED=true
+          # 도화선 2.0 코인 — app 레인은 코인 경제가 기본(연애운 해금·채팅 턴 차감).
+          # 하드코딩 이유: 이 워크플로는 app 레인 전용이고, 시크릿화하면 배포마다
+          # 값이 비면 Pydantic bool 파싱 실패로 서비스가 죽는 함정이 있다.
+          COIN_ENABLED=true
           TEST_LOGIN_ENABLED=${{ secrets.TEST_LOGIN_ENABLED }}
           TEST_LOGIN_USERNAME=${{ secrets.TEST_LOGIN_USERNAME }}
           TEST_LOGIN_PASSWORD=${{ secrets.TEST_LOGIN_PASSWORD }}
