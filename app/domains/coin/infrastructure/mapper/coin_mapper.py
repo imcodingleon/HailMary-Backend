@@ -1,4 +1,4 @@
-from app.domains.coin.domain.entity.coin_models import CoinLot, Wallet
+from app.domains.coin.domain.entity.coin_models import CoinLot, Wallet, as_aware_utc
 from app.domains.coin.infrastructure.orm.coin_orm import CoinLotORM, CoinWalletORM
 
 
@@ -9,6 +9,14 @@ class CoinMapper:
 
     @staticmethod
     def lot_to_entity(orm: CoinLotORM) -> CoinLot:
+        """ORM -> Domain 변환 지점(persistence 경계)에서 tz 정규화.
+
+        MySQL DATETIME 컬럼은 timezone이 없어 asyncmy가 naive datetime을
+        돌려준다(DB에는 항상 UTC 값이 저장된다). 여기서 UTC tzinfo를 부여해
+        entity가 항상 aware datetime을 갖도록 한다 — 이후 domain에서
+        `datetime.now(UTC)`(aware)와 비교할 때 TypeError가 나지 않는다.
+        """
+        expires_at = orm.expires_at
         return CoinLot(
             id=orm.id,
             account_id=orm.account_id,
@@ -17,8 +25,8 @@ class CoinMapper:
             original_amount=orm.original_amount,
             remaining_amount=orm.remaining_amount,
             ref=orm.ref,
-            acquired_at=orm.acquired_at,
-            expires_at=orm.expires_at,
+            acquired_at=as_aware_utc(orm.acquired_at),
+            expires_at=as_aware_utc(expires_at) if expires_at is not None else None,
             status=orm.status,
         )
 

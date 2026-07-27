@@ -65,3 +65,22 @@ def test_cost_negative_raises_value_error():
     a = _lot(1, 100, datetime(2026, 7, 1, tzinfo=UTC))
     with pytest.raises(ValueError):
         CoinSpendingPolicy().plan_spend([a], cost=-5, now=NOW)
+
+
+def test_plan_spend_naive_lots_vs_aware_now_does_not_raise():
+    """실 MySQL 재현: repository가 돌려주는 lot들의 datetime은 naive,
+    SpendCoinsUseCase의 now는 UTC-aware. 수정 전에는 plan_spend 내부
+    정렬/만료판정에서 TypeError가 발생했다."""
+    soon = _lot(1, 100, datetime(2026, 6, 10))  # naive
+    later = _lot(2, 100, datetime(2026, 12, 1))  # naive
+    aware_now = datetime(2026, 6, 1, tzinfo=UTC)
+    plan = CoinSpendingPolicy().plan_spend([later, soon], cost=30, now=aware_now)
+    assert plan.draws == [type(plan.draws[0])(lot_id=1, amount=30)]
+
+
+def test_plan_spend_naive_expired_lot_excluded_with_aware_now():
+    expired = _lot(1, 100, datetime(2026, 5, 1))  # naive, expired
+    ok = _lot(2, 100, datetime(2026, 7, 1))  # naive, not yet expired
+    aware_now = datetime(2026, 6, 1, tzinfo=UTC)
+    plan = CoinSpendingPolicy().plan_spend([expired, ok], cost=10, now=aware_now)
+    assert plan.draws[0].lot_id == 2
