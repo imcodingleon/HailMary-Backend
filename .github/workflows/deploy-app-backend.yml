@@ -81,7 +81,13 @@ jobs:
           # 하드코딩 이유: 이 워크플로는 app 레인 전용이고, 시크릿화하면 배포마다
           # 값이 비면 Pydantic bool 파싱 실패로 서비스가 죽는 함정이 있다.
           COIN_ENABLED=true
-          TEST_LOGIN_ENABLED=${{ secrets.TEST_LOGIN_ENABLED }}
+          # PG 심사용 테스트 계정 로그인 — app 레인에서만 ON.
+          # ⚠️ secrets.TEST_LOGIN_ENABLED는 deploy.yml(1.0 prod)·deploy-staging.yml과
+          #    공유되는 레포 단일 시크릿이라, true로 뒤집으면 1.0 prod가 "장전"된다
+          #    (다음 prod 배포 순간 www에도 테스트 로그인이 살아남 — TEST_LOGIN_HANDOFF.md 함정①).
+          #    이 워크플로는 2.0 브랜치 전용이므로 여기에만 하드코딩해 1.0 무영향을 보장한다.
+          # 🔁 심사 종료 후 원복: 아래를 false로 (TEST_LOGIN_HANDOFF.md §6)
+          TEST_LOGIN_ENABLED=true
           TEST_LOGIN_USERNAME=${{ secrets.TEST_LOGIN_USERNAME }}
           TEST_LOGIN_PASSWORD=${{ secrets.TEST_LOGIN_PASSWORD }}
           PORTONE_ENABLED=${{ secrets.PORTONE_ENABLED }}
